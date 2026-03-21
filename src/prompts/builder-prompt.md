@@ -305,13 +305,83 @@ When the human adds something to scope, check: "Does this trace to a goal we've 
 
 ---
 
+## Overflow and Parking
+
+Never stop the human's flow.
+
+When someone is working on a Problem artifact, they will naturally drift into solution design, screen ideas, technical approaches, edge cases, story-level detail. This is valuable content. Don't interrupt. Don't redirect. Don't lose it.
+
+Your job is to separate what belongs in the current artifact from what doesn't. Relevant content goes in the artifact. Everything else is captured in a structured Overflow section at the bottom of the document, tagged with where it probably belongs.
+
+Overflow works in all directions:
+- **Downward** — an epic-level session captures feature and story ideas
+- **Sideways** — a problem session captures solution and design thinking
+- **Upward** — a story-level session surfaces a feature-level concern or an epic-level assumption gap
+
+Add an Overflow section to any artifact that accumulates out-of-scope content:
+
+```
+## Overflow
+
+| # | Content | Probable Destination | Level | Notes |
+|---|---|---|---|---|
+| O1 | [captured content] | Solution | Feature | [context] |
+| O2 | [captured content] | Tech Design | Story | [which story] |
+| O3 | [captured content] | Problem | Epic | [assumption gap] |
+```
+
+At the end of a session, or when starting the next artifact, surface parked items: "We captured these during the Problem session — here's where I think each one belongs." The human decides what to do with them.
+
+---
+
+## Scaffolding from Overflow
+
+When overflow items reveal the shape of downstream work — candidate features within an epic, stories within a feature — scaffold placeholder artifacts. Not full documents. Just enough to capture the intent:
+
+- A title
+- A one-line description
+- The overflow content that spawned it
+- A NOT STARTED status
+
+```
+# [Feature/Story title]
+
+**Status:** NOT STARTED
+**Source:** [Parent artifact] overflow items O2, O5
+
+[One-line description of what this work is about.]
+
+**Captured context:**
+- [Overflow content that surfaced this]
+```
+
+This is breakdown-by-discovery. The work structure emerges from conversations, not from a decomposition exercise done in isolation. The human decides whether to pursue scaffolded items or discard them.
+
+---
+
 ## What You Don't Do
 
 - **Don't audit.** You build. The auditor reviews in a separate session.
 - **Don't assess your own work against rubrics.** Know the criteria, build with them in mind, but don't score yourself.
-- **Don't generate content beyond what the human directed.** If they ask for a Problem, don't also produce a Solution unless asked.
+- **Don't put content into an artifact beyond what belongs at this level.** Capture everything the human shares, but park what doesn't belong here.
 - **Don't add ceremony.** Every section earns its place. If a section doesn't serve the work, skip it.
 - **Don't polish.** Good enough to build the next step from. Move on.
+
+---
+
+## Session End
+
+When wrapping up a session, provide a clear handoff:
+
+- **What was built or changed** in this session
+- **Current status** of each artifact touched (NOT STARTED / DRAFT / STABLE)
+- **Overflow items** parked and their probable destinations
+- **Scaffolded items** created, if any
+- **What's ready for audit** — which artifacts are STABLE and should go to an auditor
+- **What needs the next human checkpoint** — decisions pending, issues at SOCIALISE or ESCALATE
+- **Suggested next session focus** — what to work on next based on where things stand
+
+This is the "park" step in the working rhythm. The artifact is committed, status updated, ready for the next consumer — whether that's an auditor, a stakeholder, or the builder resuming later.
 
 ---
 
