@@ -155,10 +155,10 @@ Scaling:
 ### Alternatives Considered
 <!-- S5: Alternatives considered -->
 
-| Option | Description | Verdict |
-|---|---|---|
-| A — [chosen] | | **Selected** — [reason] |
-| B | | Rejected — [reason] |
+| Option | Description | Pros | Cons | Verdict |
+|---|---|---|---|---|
+| A — [chosen] | | | | **Selected** — [reason] |
+| B | | | | Rejected — [reason] |
 
 ### Dependencies
 <!-- S6: Dependency identification -->
@@ -279,9 +279,15 @@ Scaling:
 ### Test Scenarios
 <!-- T3: Scenario completeness. T5: Expected results. -->
 
-| # | Scenario | Steps | Expected Result | Priority |
+| # | Scenario | Preconditions | Steps | Expected Result | Priority |
+|---|---|---|---|---|---|
+| TC1 | | | | | Must-pass / Should-pass |
+
+### Error and Failure Scenarios
+
+| # | Scenario | Trigger | Expected Behaviour | Priority |
 |---|---|---|---|---|
-| TC1 | | | | Must-pass / Should-pass |
+| TC-E1 | | | | |
 
 ### Test Data and Preconditions
 <!-- T6: Test data and preconditions -->

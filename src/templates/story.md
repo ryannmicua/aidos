@@ -83,12 +83,12 @@ Integration points. Error handling approach.]
 
 ## Issues
 
-| # | Issue | Status |
-|---|---|---|
-| I1 | | OPEN / SOCIALISE / ESCALATE / DEFERRED |
+| # | Source | Issue | Status |
+|---|---|---|---|
+| I1 | | | OPEN / SOCIALISE / ESCALATE / DEFERRED |
 
 ## Decisions
 
-| # | Issue | Resolution | Date |
-|---|---|---|---|
-| D1 | | | |
+| # | Source | Issue | Resolution | Date |
+|---|---|---|---|---|
+| D1 | | | | |
