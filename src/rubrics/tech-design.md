@@ -1,6 +1,6 @@
 # Tech Design Rubric
 
-Discipline-specific criteria for assessing Tech Design artifacts through the **Architecture lens**.
+Discipline-specific criteria for assessing Tech Design artifacts through the **Architecture lens**. This rubric checks whether the design is implementable — by a developer or an AI coding agent — without ambiguity, hidden assumptions, or unstated constraints.
 
 ---
 
@@ -8,10 +8,16 @@ Discipline-specific criteria for assessing Tech Design artifacts through the **A
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
-| A1 | Component clarity | Every component is named, its responsibility is stated, and its boundaries are defined. A developer (or coding agent) can identify what to build without ambiguity. |
-| A2 | Integration points | All interfaces between components, and between this system and external systems, are explicit. Protocols, data formats, error handling at boundaries, and rate/capacity considerations are documented. |
-| A3 | Data model | Data structures, storage, and flow are defined. What's persisted, what's transient, what's cached. Schema changes and migration paths are addressed where relevant. |
-| A4 | Coding agent readiness | The Tech Design is usable as a brief for an AI coding agent. Constraints, acceptance criteria, error handling expectations, and implementation boundaries are explicit enough that an agent can implement without needing to ask clarifying questions. |
+| A1 | Component clarity | Every component is named, its responsibility is stated, and its boundaries are defined. A developer or coding agent can identify what to build without ambiguity. Responsibilities don't overlap between components, and no behaviour falls between the cracks. |
+| A2 | Integration points | All interfaces between components, and between this system and external systems, are explicit. Protocols, data formats, authentication, error handling at boundaries, and rate or capacity considerations are documented. Nothing connects to an undescribed endpoint. |
+| A3 | Data model | Data structures, storage, and flow are defined. What's persisted, what's transient, what's cached, and what's derived. Schema changes, migration paths, and data lifecycle (creation, update, archival, deletion) are addressed where relevant. |
+| A4 | Error handling strategy | The approach to errors is explicit at each layer — what's caught, what's propagated, what's retried, and what's surfaced to the user or operator. Error categories are defined. The design doesn't assume everything works; it states what happens when things don't. |
+| A5 | Technology choices justified | Technology, framework, and library selections are stated with rationale. Choices are made for fit, not habit. Where the team's default stack is used, that's a valid reason — but it's stated, not assumed. Where an unusual choice is made, the trade-off is documented. |
+| A6 | Performance and capacity | Expected load, response time targets, data volumes, and resource limits are stated. Where the design must scale, the scaling approach is described. Where it doesn't need to scale, that assumption is explicit with the threshold at which it breaks. |
+| A7 | Deployment and environment | How the system is deployed, what environments it requires, and what infrastructure dependencies it has are documented. Configuration management, secrets handling, and environment-specific behaviour are addressed. The gap between "works on my machine" and "works in production" is closed. |
+| A8 | Migration path | How the system gets from the current state to the target state without breaking existing functionality. Data migration, feature flags, backward compatibility windows, and rollback procedures are addressed where relevant. The design doesn't assume a greenfield. |
+| A9 | Constraints and boundaries | Hard limits on what the implementation must not do — security boundaries, data it must not access, APIs it must not call, performance budgets it must not exceed — are explicit. These are the guardrails for whoever implements, whether human or AI agent. |
+| A10 | Coding agent readiness | The Tech Design is usable as a brief for an AI coding agent. Acceptance criteria, error handling expectations, implementation boundaries, naming conventions, and file/module structure are explicit enough that an agent can implement without needing to ask clarifying questions or infer context from tribal knowledge. |
 
 ## Assessment
 

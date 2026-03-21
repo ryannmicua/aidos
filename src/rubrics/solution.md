@@ -1,6 +1,6 @@
 # Solution Rubric
 
-Discipline-specific criteria for assessing Solution artifacts through the **Analysis lens**.
+Discipline-specific criteria for assessing Solution artifacts through the **Analysis lens**. This rubric checks whether the proposed response works as a coherent system — or whether it's a collection of ideas that haven't been thought through together.
 
 ---
 
@@ -8,10 +8,15 @@ Discipline-specific criteria for assessing Solution artifacts through the **Anal
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
-| S1 | Conceptual coherence | The solution holds together as a system. All parts work toward the same goal, with no internal contradictions or orphaned components. A reader can see how the pieces connect. |
-| S2 | Workflow completeness | Every user or system workflow is traced end to end. Entry points, decision points, handoffs, and exit points are explicit. No "and then the user does the obvious thing" gaps. |
-| S3 | Edge cases | Boundary conditions, unusual inputs, and atypical scenarios are identified and addressed. The solution doesn't only describe the happy path. |
-| S4 | Minimum viable slice | The artifact identifies the smallest version that delivers value. Scope is bounded — what's in, what's out, and why. The slice is viable (delivers real value), not just minimal. |
+| S1 | Conceptual coherence | The solution holds together as a system. All parts work toward the same goal, with no internal contradictions or orphaned components. A reader can trace how the pieces connect and why each piece exists. |
+| S2 | Workflow completeness | Every user or system workflow is traced end to end. Entry points, decision points, handoffs, and exit points are explicit. No "and then the user does the obvious thing" gaps. The solution accounts for what happens at each step, not just the first and last. |
+| S3 | Edge cases | Boundary conditions, unusual inputs, and atypical scenarios are identified and addressed — or explicitly deferred with rationale. The solution doesn't only describe the happy path. Where an edge case is out of scope, that's a deliberate statement, not an omission. |
+| S4 | Minimum viable slice | The artifact identifies the smallest version that delivers real value. Scope is bounded — what's in, what's out, and why. The slice is viable (solves the stated problem at reduced scope), not just minimal (ships something small that doesn't actually help). |
+| S5 | Alternatives considered | At least one alternative approach was evaluated and the reasoning for rejection is documented. The chosen solution isn't the default because it was the first idea — it's the choice because it's the best fit. "We considered doing nothing" counts if genuinely evaluated. |
+| S6 | Dependency identification | External systems, teams, services, data sources, and decisions that the solution depends on are named. For each dependency, the current status is stated: available, committed, assumed, or at risk. Hidden dependencies are the ones that derail delivery. |
+| S7 | Migration and transition | The path from the current state to the proposed solution is described. If users, data, or processes need to move, the transition approach is explicit. Cutover strategy, backward compatibility, and rollback are addressed where relevant. The solution doesn't assume a clean start. |
+| S8 | Actor identification | Every person, team, system, or role that interacts with the solution is identified with their specific interactions described. The artifact is clear about who does what — not just what the system does. Where human action is required, frequency and skill expectations are stated. |
+| S9 | Constraint compliance | The solution demonstrably respects the constraints identified in the Problem artifact — regulatory, technical, organisational, budget, and timeline. Where a constraint can't be fully met, the gap is acknowledged and the mitigation or trade-off is explicit. |
 
 ## Assessment
 

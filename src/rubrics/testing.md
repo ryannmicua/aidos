@@ -1,6 +1,6 @@
 # Testing Rubric
 
-Discipline-specific criteria for assessing Testing artifacts through the **Quality lens**.
+Discipline-specific criteria for assessing Testing artifacts through the **Quality lens**. This rubric checks whether the verification approach is complete, traceable, and honest — or whether it's a checklist that gives false confidence.
 
 ---
 
@@ -8,10 +8,15 @@ Discipline-specific criteria for assessing Testing artifacts through the **Quali
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
-| T1 | Coverage | Every requirement, component, and integration point from the Tech Design has corresponding test coverage. Gaps are explicit and justified, not accidental. |
-| T2 | Traceability | Every test traces back to a requirement in the Solution or a constraint in the Tech Design. No orphaned tests that verify things nobody asked for. No requirements without corresponding verification. |
-| T3 | Scenario completeness | Tests cover the happy path, edge cases, error conditions, and boundary values. Failure scenarios identified in upstream artifacts have corresponding test cases. |
-| T4 | Exit criteria | The artifact defines what "done" looks like — specific, measurable conditions that must be met before the work is considered verified. Pass/fail is unambiguous. |
+| T1 | Coverage | Every requirement, component, and integration point from the Tech Design has corresponding test coverage. Gaps are explicit and justified — "we chose not to test X because Y" — not accidental omissions discovered later. |
+| T2 | Traceability | Every test traces back to a requirement in the Solution or a constraint in the Tech Design. No orphaned tests that verify things nobody asked for. No requirements without corresponding verification. The mapping is explicit, not implied. |
+| T3 | Scenario completeness | Tests cover the happy path, edge cases, error conditions, and boundary values. Failure scenarios identified in upstream artifacts — the Problem's risks, the Solution's edge cases, the Tech Design's error handling — have corresponding test cases. |
+| T4 | Exit criteria | The artifact defines what "done" looks like — specific, measurable conditions that must be met before the work is considered verified. Pass/fail is unambiguous. "All tests pass" is necessary but not sufficient; the criteria address coverage and confidence, not just execution. |
+| T5 | Expected results defined | Every test case has an explicit expected outcome. "Verify the system handles it correctly" fails. "The API returns 404 with error body { ... } and no side effects" passes. The expected result is specific enough that two testers would agree on pass or fail. |
+| T6 | Test data and preconditions | The data required to execute tests is identified — what it looks like, where it comes from, and how it's set up and torn down. Preconditions for each test scenario are stated. Tests don't assume a particular system state without establishing it. |
+| T7 | Environment requirements | What environments are needed to execute the test plan, and what dependencies those environments have, are stated. If tests require specific infrastructure, third-party sandboxes, or production-like data, those requirements are explicit and achievable. |
+| T8 | Regression awareness | The artifact identifies what existing functionality could be affected by the change and includes tests to verify it still works. New features don't ship with blind spots on the things they might break. The scope of regression testing is proportionate to the blast radius of the change. |
+| T9 | Risk-based prioritisation | Tests are prioritised by risk and impact, not listed flat. The artifact distinguishes between must-pass tests (blocking release) and should-pass tests (important but not blocking). When time is short, the team knows which tests to run first and which to defer. |
 
 ## Assessment
 
