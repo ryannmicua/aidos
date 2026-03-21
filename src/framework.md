@@ -112,9 +112,18 @@ Not every piece of work needs the full stack at every level of detail.
 
 **Epic** — a large initiative spanning multiple sprints and people. Each artifact is a separate document. Problem, Solution, Tech Design, and Test Strategy get thorough treatment because the cost of getting them wrong is high and many people depend on them.
 
-**Feature** — a specific deliverable, one to two sprints, typically one builder. A single combined document with Problem, Solution, Tech Design, and Test Plan as sections. The Problem section can be lightweight if the Epic Problem is strong. The Tech Design section carries the most weight — it's the brief for the coding agent.
+**Feature** — a specific deliverable, one to two sprints, typically one builder. Artifacts can be separate documents or combined into one file — the builder decides based on the work. The Problem section can be lightweight if the Epic Problem is strong. The Tech Design section carries the most weight — it's the brief for the coding agent.
 
-**Story** — a day or less of work. A lean document: context, user story, technical approach, and acceptance criteria with test cases. Inherits heavily from the parent feature.
+**Story** — a day or less of work. Lean artifacts that inherit heavily from the parent feature. At story scale, artifacts use familiar names — Context, User Story, Technical Approach, Acceptance Criteria — but they map directly to the four artifact types and are still assessed against the same rubrics at lighter depth.
+
+| Artifact | Epic | Feature | Story |
+|---|---|---|---|
+| Problem | Problem (full depth) | Problem (focused) | Context |
+| Solution | Solution (system-level) | Solution (feature-scope) | User Story |
+| Tech Design | Tech Design (architecture) | Tech Design (implementation brief) | Technical Approach |
+| Testing | Test Strategy | Test Plan | Acceptance Criteria |
+
+The templates in `templates/` provide maximum structure. The builder scales down based on the work — keeping sections brief or skipping them, not switching to a different template. A one-line Assumptions section is better than no Assumptions section.
 
 Use judgment. A solo developer building a well-understood API might only need a Problem and a Tech Design. A complex multi-team initiative needs the full stack at epic and feature scale. The framework provides the structure; the human decides how much to use.
 
