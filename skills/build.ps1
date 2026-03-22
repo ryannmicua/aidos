@@ -63,6 +63,7 @@ try {
     Copy-To (Join-Path $root "src\templates\overflow-log.md")       (Join-Path $b "templates\overflow-log.md")
     Copy-To (Join-Path $root "src\templates\meeting-minutes.md")    (Join-Path $b "templates\meeting-minutes.md")
     Copy-To (Join-Path $root "src\templates\retrospective.md")      (Join-Path $b "templates\retrospective.md")
+    Copy-To (Join-Path $root "CONTRIBUTING.md")                    (Join-Path $b "CONTRIBUTING.md")
 
     Fix-PromptPaths (Join-Path $b "builder-prompt.md")
 
@@ -80,6 +81,7 @@ try {
     Copy-To (Join-Path $root "src\rubrics\tech-design.md")          (Join-Path $a "rubrics\tech-design.md")
     Copy-To (Join-Path $root "src\rubrics\testing.md")              (Join-Path $a "rubrics\testing.md")
     Copy-To (Join-Path $root "src\templates\retrospective.md")     (Join-Path $a "templates\retrospective.md")
+    Copy-To (Join-Path $root "CONTRIBUTING.md")                   (Join-Path $a "CONTRIBUTING.md")
 
     Fix-PromptPaths (Join-Path $a "auditor-prompt.md")
 

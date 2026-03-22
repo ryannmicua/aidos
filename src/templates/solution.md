@@ -45,8 +45,7 @@ Scaling depth:
   Epic — full depth. The solution is the system-level design.
   Feature — focused on this feature's response. Reference the Epic
   solution for context.
-  Story — consider using story.md instead. If you use this template,
-  keep sections brief.
+  Story — keep sections brief.
 -->
 
 # Solution: [title]
@@ -136,6 +135,7 @@ reversed.]
 ---
 
 ## Issues
+<!-- Source: where this issue was first identified — an artifact name, session, meeting, or external input. -->
 
 | # | Source | Issue | Status |
 |---|---|---|---|
@@ -143,6 +143,6 @@ reversed.]
 
 ## Decisions
 
-| # | Source | Issue | Resolution | Date |
-|---|---|---|---|---|
-| D1 | | | | |
+| # | Source | Issue | Resolution | Decided By | Date |
+|---|---|---|---|---|---|
+| D1 | | | | | |

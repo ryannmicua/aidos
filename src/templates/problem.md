@@ -46,8 +46,7 @@ Scaling depth:
   Epic — full depth. Every section is thorough.
   Feature — lighter if the Epic problem is strong. Focus on what's
   specific to this feature.
-  Story — consider using story.md instead. If you use this template,
-  most sections can be one line.
+  Story — most sections can be one line.
 
   Scale down by keeping sections brief, not by deleting them. A one-line
   Assumptions section that says "inherits from Epic" is better than no
@@ -146,6 +145,7 @@ Why this needs addressing now. What happens if it isn't.]
 ---
 
 ## Issues
+<!-- Source: where this issue was first identified — an artifact name, session, meeting, or external input. -->
 
 | # | Source | Issue | Status |
 |---|---|---|---|
@@ -153,6 +153,6 @@ Why this needs addressing now. What happens if it isn't.]
 
 ## Decisions
 
-| # | Source | Issue | Resolution | Date |
-|---|---|---|---|---|
-| D1 | | | | |
+| # | Source | Issue | Resolution | Decided By | Date |
+|---|---|---|---|---|---|
+| D1 | | | | | |

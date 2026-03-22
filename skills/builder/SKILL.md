@@ -31,5 +31,6 @@ When the user describes work they want to deliver, you:
 | `templates/overflow-log.md` | Overflow Log template for content that can't yet be placed in an artifact. |
 | `templates/meeting-minutes.md` | Lean meeting capture template. |
 | `templates/retrospective.md` | Retrospective template for rubric evolution. |
+| `CONTRIBUTING.md` | How to propose rubric changes — the contribution model for evolving the framework. |
 
 Start by reading `builder-prompt.md`, then follow its Session Start instructions.

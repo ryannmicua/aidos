@@ -51,6 +51,7 @@ jobs:
           cp src/templates/overflow-log.md _staging/aidos-builder/templates/
           cp src/templates/meeting-minutes.md _staging/aidos-builder/templates/
           cp src/templates/retrospective.md _staging/aidos-builder/templates/
+          cp CONTRIBUTING.md _staging/aidos-builder/
           sed -i 's|`src/rubrics/|`rubrics/|g; s|`src/templates/|`templates/|g; s|`src/framework\.md`|`framework.md`|g' _staging/aidos-builder/builder-prompt.md
 
       # Assemble auditor skill
@@ -66,6 +67,7 @@ jobs:
           cp src/rubrics/tech-design.md _staging/aidos-auditor/rubrics/
           cp src/rubrics/testing.md _staging/aidos-auditor/rubrics/
           cp src/templates/retrospective.md _staging/aidos-auditor/templates/
+          cp CONTRIBUTING.md _staging/aidos-auditor/
           sed -i 's|`src/rubrics/|`rubrics/|g; s|`src/templates/|`templates/|g; s|`src/framework\.md`|`framework.md`|g' _staging/aidos-auditor/auditor-prompt.md
 
       # Create ZIPs with folder at root

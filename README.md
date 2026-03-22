@@ -51,14 +51,14 @@ The artifacts hold the state so you can context-switch between projects without 
 
 ## Example
 
-A team needs to improve how advisers access fund commentary:
+A team needs to improve how warehouse staff track inventory across multiple locations:
 
 | Artifact | What Gets Captured |
 |---|---|
-| **Problem** | Advisers can't find the latest approved fund commentary quickly enough. Current process requires navigating three systems. Time cost: ~15 min per lookup. |
-| **Solution** | Add a commentary summary component to the product page. Pull from the approved source, surface the latest version inline. |
-| **Tech Design** | Query approved source API, cache daily, expose via existing service layer. Component renders markdown with fallback to "no commentary available." |
-| **Testing** | Validate source freshness, permissions, rendering across browsers, fallback states. Every test traces to a requirement in the Solution. |
+| **Problem** | Warehouse staff can't get accurate stock counts without checking three separate systems, taking ~20 min per lookup. Affects 150+ operators making daily restocking decisions. |
+| **Solution** | Add a unified stock dashboard to the warehouse management interface. Pull live counts from existing inventory sources, surface inline. |
+| **Tech Design** | Query inventory APIs, cache counts with 15-minute refresh, expose via existing service layer. Component renders stock levels with fallback to "data unavailable." |
+| **Testing** | Validate data freshness, permissions, rendering across devices, fallback states. Every test traces to a requirement in the Solution. |
 
 The Problem artifact gets audited: is the stakeholder impact clear? Are the goals measurable? Is the scope bounded? Then the Solution gets audited against the Problem: does it actually address the stated goals? Then the Tech Design against the Solution. The chain holds or it breaks at an identifiable point.
 

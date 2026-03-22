@@ -344,7 +344,7 @@ The Overflow Log is a project-level document (see `src/templates/overflow-log.md
 - **DISCARDED** — intentionally killed. Rationale recorded. Done.
 - **BACKLOG** — out of scope for this iteration. May return. Intentionally deferred.
 
-At Epic scale, the Overflow Log is a separate document alongside the Issues Log. At Feature scale it's optional — overflow can go into the parent Epic's log. At Story scale, overflow goes into the parent Feature's log.
+At Epic scale, the Overflow Log is a separate document alongside the Issues Log. At Feature scale it's optional — overflow can go into the parent Epic's log. If a Feature has no parent Epic, it needs its own Overflow Log. At Story scale, overflow goes into the parent Feature's log.
 
 A project cannot close with PARKED items. They must be harvested, discarded, or moved to the backlog.
 

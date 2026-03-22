@@ -46,8 +46,7 @@ Scaling depth:
   technology decisions. Implementation detail lives in Feature designs.
   Feature — the primary implementation brief. This is what the coding
   agent receives. Go deep.
-  Story — consider using story.md instead. If you use this template,
-  focus on Technical Approach and Coding Agent Brief.
+  Story — focus on Technical Approach and Coding Agent Brief.
 -->
 
 # Tech Design: [title]
@@ -160,6 +159,7 @@ Backward compatibility window. Data migration steps if applicable.]
 ---
 
 ## Issues
+<!-- Source: where this issue was first identified — an artifact name, session, meeting, or external input. -->
 
 | # | Source | Issue | Status |
 |---|---|---|---|
@@ -167,6 +167,6 @@ Backward compatibility window. Data migration steps if applicable.]
 
 ## Decisions
 
-| # | Source | Issue | Resolution | Date |
-|---|---|---|---|---|
-| D1 | | | | |
+| # | Source | Issue | Resolution | Decided By | Date |
+|---|---|---|---|---|---|
+| D1 | | | | | |

@@ -175,6 +175,7 @@ Coherence check:
 ---
 
 ## Issues
+<!-- Source: where this issue was first identified — an artifact name, session, meeting, or external input. -->
 
 | # | Source | Issue | Status |
 |---|---|---|---|
@@ -182,6 +183,6 @@ Coherence check:
 
 ## Decisions
 
-| # | Source | Issue | Resolution | Date |
-|---|---|---|---|---|
-| D1 | | | | |
+| # | Source | Issue | Resolution | Decided By | Date |
+|---|---|---|---|---|---|
+| D1 | | | | | |
