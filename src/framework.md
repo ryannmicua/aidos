@@ -247,23 +247,23 @@ The full artifact chain — Problem through Solution through Tech Design — giv
 
 ## Worked Example
 
-**Scenario:** A team needs to improve how advisers access fund commentary.
+**Scenario:** A team needs to improve how warehouse staff track inventory across multiple locations.
 
 ### Problem
 
-Advisers can't find the latest approved fund commentary quickly enough. The current process requires navigating three separate systems, taking approximately 15 minutes per lookup. This affects 200+ advisers making daily investment decisions. Goal: reduce commentary access time to under 30 seconds. Non-goal: redesigning the commentary authoring workflow.
+Warehouse staff can't get accurate stock counts without checking three separate systems, taking approximately 20 minutes per lookup. This affects 150+ warehouse operators making daily restocking decisions. Goal: reduce stock lookup time to under 30 seconds. Non-goal: redesigning the procurement workflow.
 
 ### Solution
 
-Add a commentary summary component to the adviser product page. Pull the latest approved version from the existing commentary source, surface it inline. Two options were considered: embedded component (chosen) vs. separate commentary hub page (rejected — adds navigation, doesn't solve the core access time problem).
+Add a unified stock dashboard to the warehouse management interface. Pull live counts from the existing inventory sources, surface inline. Two options were considered: embedded dashboard (chosen) vs. separate inventory hub (rejected — adds navigation, doesn't solve the core lookup time problem).
 
 ### Tech Design
 
-Query the approved source API, cache responses daily, expose via the existing service layer. Component renders markdown with fallback to "no commentary available." Error handling: stale cache serves last-known-good; API timeout after 3 seconds triggers fallback. No new database tables required.
+Query inventory APIs, cache counts with 15-minute refresh, expose via the existing service layer. Component renders stock levels with fallback to "data unavailable." Error handling: stale cache serves last-known-good; API timeout after 3 seconds triggers fallback. No new database tables required.
 
 ### Testing
 
-Validate source freshness (commentary updates within 24h), permissions (only approved commentary surfaces), rendering across supported browsers, fallback states (API down, no commentary exists, stale cache). Every test traces to a requirement in the Solution.
+Validate data freshness (counts update within 15 minutes), permissions (only authorised stock data surfaces), rendering across devices, fallback states (API down, no data exists, stale cache). Every test traces to a requirement in the Solution.
 
 ### Audit Finding (Example)
 
@@ -271,17 +271,17 @@ On Pass 1, the auditor flagged the Tech Design against the Problem:
 
 | Criterion | Assessment | Evidence | Classification |
 |---|---|---|---|
-| A2: Integration points | Partial | API rate limits not addressed. 200+ advisers hitting cached endpoint simultaneously on market open — is the cache refresh strategy sufficient? | Risk |
+| A2: Integration points | Partial | API rate limits not addressed. 150+ operators hitting cached endpoint simultaneously at shift changeover — is the cache refresh strategy sufficient? | Risk |
 
-The builder addressed it by adding a pre-warm cache job at 6am, before market open. Pass 2 cleared.
+The builder addressed it by adding a pre-warm cache job 10 minutes before each shift change. Pass 2 cleared.
 
 ### Escalated Decision (Example)
 
 During the Problem stage, an issue was escalated:
 
-> **I3: Commentary ownership.** Three teams currently publish commentary with no single approval process. Who is the authoritative source?
+> **I3: Inventory data ownership.** Three warehouse locations maintain separate inventory records with no single source of truth. Which system is authoritative?
 >
-> **Options:** (A) Use the most recently published from any team. (B) Designate one team as authoritative. (C) Surface all with team attribution.
+> **Options:** (A) Use the most recently updated count from any location. (B) Designate one system as authoritative. (C) Surface all with location attribution.
 >
 > **Recommendation:** Option B — designate one authoritative source. Simplest implementation, clearest accountability.
 >
