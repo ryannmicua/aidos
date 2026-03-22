@@ -110,11 +110,11 @@ This is especially important for AI-assisted work, where sessions are transient.
 
 Not every piece of work needs the full stack at every level of detail.
 
-**Epic** — a large initiative spanning multiple sprints and people. Each artifact is a separate document. Problem, Solution, Tech Design, and Test Strategy get thorough treatment because the cost of getting them wrong is high and many people depend on them.
+**Epic** — a large initiative spanning multiple sprints and people. Problem, Solution, Tech Design, and Test Strategy are each a separate document, plus an Issues Log. Every artifact gets thorough treatment because the cost of getting them wrong is high and many people depend on them.
 
-**Feature** — a specific deliverable, one to two sprints, typically one builder. Artifacts can be separate documents or combined into one file — the builder decides based on the work. The Problem section can be lightweight if the Epic Problem is strong. The Tech Design section carries the most weight — it's the brief for the coding agent.
+**Feature** — a specific deliverable, one to two sprints, typically one builder. Problem, Solution, and Tech Design are combined into one document. Testing is a separate Test Plan. The Problem section can be lightweight if the Epic Problem is strong. The Tech Design section carries the most weight — it's the brief for the coding agent.
 
-**Story** — a day or less of work. Lean artifacts that inherit heavily from the parent feature. At story scale, artifacts use familiar names — Context, User Story, Technical Approach, Acceptance Criteria — but they map directly to the four artifact types and are still assessed against the same rubrics at lighter depth.
+**Story** — a day or less of work. Everything lives in a single document. Lean artifacts that inherit heavily from the parent feature. At story scale, the artifacts compress enough that their form changes, so they take different names: Problem becomes Context, Solution becomes User Story, Tech Design becomes Technical Approach, and Testing becomes Acceptance Criteria. They map directly to the four artifact types and are still assessed against the same rubrics at lighter depth.
 
 | Artifact | Epic | Feature | Story |
 |---|---|---|---|
@@ -123,9 +123,31 @@ Not every piece of work needs the full stack at every level of detail.
 | Tech Design | Tech Design (architecture) | Tech Design (implementation brief) | Technical Approach |
 | Testing | Test Strategy | Test Plan | Acceptance Criteria |
 
+### Document Structure by Scale
+
+The scale of the work determines the document structure. This is not a suggestion — the builder does not choose how to split artifacts.
+
+| Scale | Document Structure |
+|---|---|
+| **Epic** | 4 separate documents (Problem, Solution, Tech Design, Test Strategy) + Issues Log |
+| **Feature** | 1 combined document (Problem + Solution + Tech Design) + 1 separate Test Plan |
+| **Story** | 1 document containing everything |
+
+### Artifact Naming
+
+At Epic and Feature scale, Problem, Solution, and Tech Design keep their names — the depth changes, but the form doesn't. Testing renames at both scales (Test Strategy at Epic, Test Plan at Feature) because it genuinely changes form at each level.
+
+At Story scale, all four artifacts compress enough that they become something different in kind, not just in depth. They take familiar names that reflect their compressed form: Context, User Story, Technical Approach, Acceptance Criteria. The rubrics still apply — the mapping is one-to-one — but the names signal that the builder should think in the compressed form, not try to write a shallow version of the full artifact.
+
 The templates in `src/templates/` provide maximum structure. The builder scales down based on the work — keeping sections brief or skipping them, not switching to a different template. A one-line Assumptions section is better than no Assumptions section.
 
 Use judgment. A solo developer building a well-understood API might only need a Problem and a Tech Design. A complex multi-team initiative needs the full stack at epic and feature scale. The framework provides the structure; the human decides how much to use.
+
+### .aidos/ Convention
+
+An AIDOS project root is identified by a `.aidos/` folder. This is where artifacts live. The folder can sit at a repo root, inside a monorepo package, or anywhere the user needs to anchor their delivery work.
+
+Git is the source of truth. Artifacts are authored, committed, and reviewed through the repository — the same way as code. Publishing to other systems (Confluence, GitHub Pages, etc.) is optional and outbound. The `.aidos/` folder and the repo's version history are the canonical record.
 
 ---
 

@@ -29,12 +29,16 @@ Everything goes in the artifact. If it happened in the session — a decision, a
 Figure out where you are:
 
 **Starting fresh?** Ask the human what they're working on. Listen for signals about scale and which artifact to start with:
-- They describe a problem, pain point, or opportunity → start with Problem
-- They describe how something should work → start with Solution
-- They have technical details ready → start with Tech Design
-- They want to define what "done" looks like → start with Testing
+- They describe a problem, pain point, or opportunity → start with Problem (or Context at story scale)
+- They describe how something should work → start with Solution (or User Story at story scale)
+- They have technical details ready → start with Tech Design (or Technical Approach at story scale)
+- They want to define what "done" looks like → start with Testing (or Acceptance Criteria at story scale)
 
 Don't force them to declare a scale or artifact type. Infer it from what they share. If it's unclear, ask: "Is this a large initiative with multiple teams, a specific feature, or a small piece of work?"
+
+Once you know the scale, scaffold the correct document structure immediately — don't ask the human how to organise the files. See the Scaling section for the mandated structure at each scale.
+
+**Working location.** If connected to a repo, look for or create a `.aidos/` folder as the project root. All artifacts are authored relative to this folder. If not connected to a repo, work with files as provided by the human — the `.aidos/` convention applies when git is available, not always.
 
 **Continuing?** Load the existing artifacts. Summarise the current state before proceeding: what's been done, what's the status, where did we leave off. Then pick up where the human directs.
 
@@ -66,13 +70,13 @@ Not every piece of work needs the full stack at full depth.
 | Tech Design | Tech Design (architecture) | Tech Design (implementation brief) | Technical Approach |
 | Testing | Test Strategy | Test Plan | Acceptance Criteria |
 
-**Epic** — large initiative, multiple sprints and people. Artifacts are separate documents. Full depth because the cost of getting it wrong is high.
+**Epic** — large initiative, multiple sprints and people. Create 4 separate files (Problem, Solution, Tech Design, Test Strategy) plus an Issues Log. Full depth because the cost of getting it wrong is high.
 
-**Feature** — one to two sprints, typically one builder. Artifacts can be separate documents or combined into one file. The Problem can be lightweight if the Epic problem is strong. The Tech Design carries the most weight — it's the coding agent brief.
+**Feature** — one to two sprints, typically one builder. Create 1 combined file with Problem, Solution, and Tech Design sections, plus 1 separate Test Plan. The Problem section can be lightweight if the Epic Problem is strong. The Tech Design section carries the most weight — it's the coding agent brief.
 
-**Story** — a day or less. Lean artifacts that inherit heavily from the parent Feature. Use the familiar names: Context, User Story, Technical Approach, Acceptance Criteria. These map directly to the four artifact types. At story scale, you can produce all artifacts in a single lean document.
+**Story** — a day or less. Create 1 file containing everything. Lean artifacts that inherit heavily from the parent Feature. At story scale, artifacts compress enough that their form changes — use the renamed labels: Context (not Problem), User Story (not Solution), Technical Approach (not Tech Design), Acceptance Criteria (not Testing). These map directly to the four artifact types and are still assessed against the same rubrics at lighter depth.
 
-**You decide the structure.** Based on what the human describes, suggest whether artifacts should be separate files or combined, and how deep each should go. The human confirms or overrides.
+**The scale determines the structure.** This is mandated by the framework — builders don't choose how to split artifacts. When scale is established, scaffold the correct documents immediately. The human decides depth and scope; the framework decides document structure.
 
 Scale down by keeping sections brief, not by deleting them. A one-line Assumptions section that says "inherits from Epic" is better than no Assumptions section.
 
