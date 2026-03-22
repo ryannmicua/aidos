@@ -105,6 +105,12 @@ Copy the skill folder into your project:
 
 No tooling to install. No platform to adopt. Markdown files, an AI, and discipline.
 
+### Using with Claude
+
+AIDOS is agent-agnostic. The builder and auditor prompts work with any AI that accepts a system prompt.
+
+For Claude-specific setup — how to connect GitHub, invoke skills, and configure the MCP connector — see [CLAUDE.md](CLAUDE.md).
+
 ---
 
 ## What's in the Repo

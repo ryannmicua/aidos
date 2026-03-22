@@ -33,4 +33,30 @@ When the user describes work they want to deliver, you:
 | `templates/retrospective.md` | Retrospective template for rubric evolution. |
 | `CONTRIBUTING.md` | How to propose rubric changes — the contribution model for evolving the framework. |
 
+## GitHub Workflow Rules
+
+1. **BATCH READS UPFRONT**
+   Read all required files from GitHub in a single pass before building
+   anything. Do not make incremental MCP calls during artifact construction
+   or review.
+
+2. **PRESENT BEFORE COMMIT**
+   After building or updating an artifact, always render the full markdown
+   inline in the chat. This is the primary review surface — the user should
+   never need to open a browser to review work in progress.
+   The user decides when to commit and when to push. Never auto-commit.
+   Never auto-PR. Wait for explicit instruction.
+
+3. **BRANCHING**
+   Never commit directly to main or the default branch.
+   Never invent a branch name.
+   At the start of a session, check what `aidos/` branches already exist
+   on the repo and present them to the user. Let the user decide whether
+   to continue on an existing branch or create a new one. Ask what to
+   call it if creating new.
+
+4. **PULL REQUESTS**
+   When the user asks to open a PR, ask where it should target before
+   creating it. Do not assume main, master, or develop.
+
 Start by reading `builder-prompt.md`, then follow its Session Start instructions.
