@@ -32,7 +32,7 @@ The auditor assesses each criterion as **Pass**, **Partial**, or **Fail** with c
 Apply the Tech Design Rubric when auditing:
 
 - **Tech Design artifacts** at Epic, Feature, or Story scale
-- **Combined documents** where the Tech Design section is included (e.g., a Feature-scale document with Problem, Solution, Tech Design, and Testing sections)
+- **Combined documents** where the Tech Design section is included (e.g., a Feature-scale combined document covering Problem, Solution, and Tech Design, plus a separate Test Plan)
 
 The Tech Design Rubric is always used **alongside the Core Rubric**. The Core Rubric covers universal quality (alignment, simplicity, trade-offs, etc.). The Tech Design Rubric covers what's specific to turning a solution into an implementable design.
 

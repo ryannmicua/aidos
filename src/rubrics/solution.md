@@ -31,7 +31,7 @@ The auditor assesses each criterion as **Pass**, **Partial**, or **Fail** with c
 Apply the Solution Rubric when auditing:
 
 - **Solution artifacts** at Epic, Feature, or Story scale
-- **Combined documents** where the Solution section is included (e.g., a Feature-scale document with Problem, Solution, Tech Design, and Testing sections)
+- **Combined documents** where the Solution section is included (e.g., a Feature-scale combined document covering Problem, Solution, and Tech Design, plus a separate Test Plan)
 
 The Solution Rubric is always used **alongside the Core Rubric**. The Core Rubric covers universal quality (alignment, simplicity, trade-offs, etc.). The Solution Rubric covers what's specific to designing a coherent response to the problem.
 

@@ -31,7 +31,7 @@ The auditor assesses each criterion as **Pass**, **Partial**, or **Fail** with c
 Apply the Testing Rubric when auditing:
 
 - **Testing artifacts** (Test Strategy at Epic scale, Test Plan at Feature scale, Acceptance Criteria at Story scale)
-- **Combined documents** where the Testing section is included (e.g., a Feature-scale document with Problem, Solution, Tech Design, and Testing sections)
+- **Combined documents** where the Testing section is included (e.g., a Feature-scale combined document covering Problem, Solution, and Tech Design, plus a separate Test Plan)
 
 The Testing Rubric is always used **alongside the Core Rubric**. The Core Rubric covers universal quality (alignment, simplicity, trade-offs, etc.). The Testing Rubric covers what's specific to verifying that the implementation meets its goals.
 

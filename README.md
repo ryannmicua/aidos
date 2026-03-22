@@ -100,7 +100,7 @@ Copy the skill folder into your project:
 1. Read [`src/framework.md`](src/framework.md) — the mechanics, rubrics, and operating model.
 2. Pick your scale: **Epic** (big initiative), **Feature** (one deliverable), or **Story** (a day's work).
 3. Open any AI chat. Load the [builder prompt](src/prompts/builder-prompt.md) — it's self-contained.
-4. Build the Problem first. Get it reviewed. Then Solution. Then Tech Design. Then Testing.
+4. Build through the stack in order — Problem, then Solution, then Tech Design, then Testing — using the document structure for your scale. At Feature and Story scale, multiple artifacts combine into one document.
 5. Have someone who didn't build it [audit](src/prompts/auditor-prompt.md) against the rubrics and the preceding artifact.
 
 No tooling to install. No platform to adopt. Markdown files, an AI, and discipline.
@@ -131,6 +131,7 @@ src/
 │   ├── tech-design.md            ← Tech Design artifact template
 │   ├── testing.md                ← Testing artifact template
 │   ├── issues-log.md             ← Centralised escalation register
+│   ├── overflow-log.md           ← Captures ideas, risks, and insights that don't belong in the current artifact
 │   ├── meeting-minutes.md        ← Lean meeting capture
 │   └── retrospective.md          ← Rubric evolution mechanism
 └── prompts/

@@ -141,6 +141,8 @@ At Story scale, all four artifacts compress enough that they become something di
 
 The templates in `src/templates/` provide maximum structure. The builder scales down based on the work — keeping sections brief or skipping them, not switching to a different template. A one-line Assumptions section is better than no Assumptions section.
 
+Scale determines document structure; which artifacts to instantiate is always a human judgment call.
+
 Use judgment. A solo developer building a well-understood API might only need a Problem and a Tech Design. A complex multi-team initiative needs the full stack at epic and feature scale. The framework provides the structure; the human decides how much to use.
 
 ### .aidos/ Convention

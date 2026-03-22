@@ -41,7 +41,7 @@ Open an issue first. Include:
 >
 > **Example evidence:** Auditor checks for a named owner in the artifact. If the owner field says "TBD," "to be confirmed," or is missing, it's a Fail.
 >
-> **Changelog:** Added C13 Operational Ownership — driven by project where no production owner was identified until week 6, causing delivery pause.
+> **Changelog:** Updated C8 Operational Impact — tightened pass condition to require a named individual or team, not just acknowledgment of impact.
 
 ### What Makes a Good Criterion
 
