@@ -11,7 +11,7 @@ structure as a page hierarchy in Confluence.
 
 - **Folders become pages** — subdirectories create parent pages with their
   contents as child pages
-- **Status, Scale, Owner** are parsed from each file's metadata lines and
+- **Status and Owner** are parsed from each file's metadata lines and
   rendered as a Confluence Page Properties table
 - **Pages are matched by title** — no IDs stored in the manifest. Delete a
   page in Confluence, re-sync, it recreates cleanly.
@@ -45,12 +45,17 @@ structure as a page hierarchy in Confluence.
 
 | Scenario | What happens |
 |----------|-------------|
-| Folder has a `.md` file with the same name (`feature-auth/feature-auth.md`) | File content becomes the page body. Children macro appended to list child pages. |
+| Folder named `epic/`, `feature/`, or `story/` | **Transparent** — no Confluence page created. Contents promoted to the parent level with the scale applied as a label. |
+| Folder has a `.md` file with the same name (`feature-auth/feature-auth.md`) | File content becomes the page body. Stories section + Children macro appended. |
 | Folder has no matching `.md` file (`refs/`) | Auto-generated page with title + Children macro. All `.md` files inside become child pages. |
 | Any depth of nesting | Fully recursive — nest as deep as you need. |
 
 Page titles are derived from filenames: strip `.md`, split on `-`,
 title-case each word. `tech-design.md` becomes **Tech Design**.
+
+If your Confluence space has existing pages with common titles (Problem,
+Testing, etc.), use `titleTemplate` in the manifest to prefix all titles.
+See [Manifest](#manifest).
 
 ## Markdown → Confluence Translation
 
@@ -60,7 +65,6 @@ macros for a rich reading experience.
 | Markdown | Confluence | Notes |
 |----------|-----------|-------|
 | `**Status:** Draft` | Status lozenge in Page Properties table | See colour mapping below |
-| `**Scale:** Feature` | Row in Page Properties table | Also applied as a label |
 | `**Owner:** Simon` | Row in Page Properties table | |
 | `[Solution](solution.md)` | `ac:link` (page title link) | Cross-artifact links resolve by title. Path prefixes stripped — works across folders. |
 | `` ```js ... ``` `` | `ac:structured-macro` code block | Syntax-highlighted with language parameter |
@@ -91,10 +95,12 @@ Every published page gets labels automatically:
 | Label | Source |
 |-------|--------|
 | Artifact type | Derived from filename: `problem`, `tech-design`, `testing`, etc. |
-| Scale | Parsed from `**Scale:** Epic` → label `epic` |
+| Scale | Inferred from directory structure: root files → `epic`, folder pages → `feature`, their children → `story` |
 | `aidos` | Always applied — identifies connector-managed pages |
 
-Labels enable Confluence search, CQL filtering, and dashboard reports.
+Scale labels power the root dashboard (separate Epics and Features
+tables) and the Stories section on feature pages. Labels enable
+Confluence search, CQL filtering, and dashboard reports.
 
 ## Prerequisites
 
@@ -121,6 +127,33 @@ Place a `manifest.json` in your `.aidos/` folder:
 
 That's it. Two fields. The script discovers files automatically, parses
 metadata from each file, and derives the Confluence space from the root page.
+
+### Title template
+
+If your Confluence space has existing pages with common names, add a
+`titleTemplate` to prefix all page titles and avoid collisions:
+
+```json
+{
+  "publish": {
+    "confluence": {
+      "baseUrl": "https://example.atlassian.net",
+      "rootPageId": "123456789",
+      "titleTemplate": "(CW) %title%"
+    }
+  }
+}
+```
+
+`%title%` is replaced with the title derived from each filename.
+Cross-artifact links (`[Solution](solution.md)`) are rewritten to use
+the templated title so Confluence can resolve them.
+
+| Template | `problem.md` becomes |
+|----------|---------------------|
+| `%title%` (default) | Problem |
+| `(CW) %title%` | (CW) Problem |
+| `CW.Core - %title%` | CW.Core - Problem |
 
 To add more targets later, add another key under `publish`:
 
