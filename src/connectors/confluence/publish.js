@@ -112,6 +112,17 @@ async function getChildPages(baseUrl, parentId) {
   return (data.results ?? []).map((p) => ({ id: p.id, title: p.title }));
 }
 
+/** Search the entire space for a page by title. Returns { id, title } or null. */
+async function findPageByTitle(baseUrl, spaceKey, title) {
+  const data = await confluenceFetch(
+    `${baseUrl}/wiki/rest/api/content?title=${encodeURIComponent(title)}&spaceKey=${spaceKey}&type=page`,
+  );
+  const results = data.results ?? [];
+  return results.length > 0
+    ? { id: results[0].id, title: results[0].title }
+    : null;
+}
+
 async function createPage(baseUrl, spaceKey, parentId, title, body) {
   return confluenceFetch(`${baseUrl}/wiki/rest/api/content`, {
     method: "POST",
@@ -308,13 +319,19 @@ async function publishPage(ctx, parentId, childPages, title, body, labels) {
     return existing ?? `dry-run-${title}`;
   }
 
-  const existing = childPages.get(title);
-  if (existing) {
-    const page = await getPage(baseUrl, existing);
-    await updatePage(baseUrl, existing, title, body, page.version);
-    await addLabels(baseUrl, existing, labels);
+  // Check children of parent first, then search entire space as fallback
+  let pageId = childPages.get(title);
+  if (!pageId) {
+    const found = await findPageByTitle(baseUrl, spaceKey, title);
+    if (found) pageId = found.id;
+  }
+
+  if (pageId) {
+    const page = await getPage(baseUrl, pageId);
+    await updatePage(baseUrl, pageId, title, body, page.version);
+    await addLabels(baseUrl, pageId, labels);
     ctx.stats.updated++;
-    return existing;
+    return pageId;
   }
 
   const created = await createPage(baseUrl, spaceKey, parentId, title, body);
@@ -467,20 +484,22 @@ async function ensureDashboard(ctx) {
     return "UNKNOWN";
   }
 
-  const page = await getPage(baseUrl, rootPageId);
+  let page = await getPage(baseUrl, rootPageId);
   const spaceKey = await getSpaceKey(baseUrl, page.spaceId);
 
   if (page.body.includes("detailssummary")) {
     console.log("Root page already has dashboard macro — skipping");
-  } else {
-    console.log("Setting dashboard body on root page %s", rootPageId);
-    await updatePage(
-      baseUrl,
-      rootPageId,
-      page.title,
-      DASHBOARD_BODY,
-      page.version,
-    );
+    return spaceKey;
+  }
+
+  console.log("Setting dashboard body on root page %s", rootPageId);
+  try {
+    await updatePage(baseUrl, rootPageId, page.title, DASHBOARD_BODY, page.version);
+  } catch (err) {
+    // Version conflict — re-fetch and retry once
+    console.log("Dashboard update failed (%s), retrying...", err.message.slice(0, 80));
+    page = await getPage(baseUrl, rootPageId);
+    await updatePage(baseUrl, rootPageId, page.title, DASHBOARD_BODY, page.version);
   }
 
   return spaceKey;
