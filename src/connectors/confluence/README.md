@@ -139,12 +139,16 @@ Validate your manifest against `manifest.schema.json` in this directory.
 
 ## GitHub Actions Workflow
 
-Add this workflow to your consuming repo:
+Add this workflow to your consuming repo. PRs dry-run (preview in the
+Actions log), merges to main publish for real:
 
 ```yaml
 name: Publish AIDOS to Confluence
 on:
+  pull_request:
+    paths: ['.aidos/**']
   push:
+    branches: [main]
     paths: ['.aidos/**']
   workflow_dispatch:
 
@@ -153,6 +157,7 @@ jobs:
     uses: shobman/aidos/.github/workflows/confluence-publish.yml@main
     with:
       manifest-path: .aidos/manifest.json
+      dry-run: ${{ github.event_name == 'pull_request' }}
     secrets:
       confluence_email: ${{ secrets.CONFLUENCE_EMAIL }}
       confluence_token: ${{ secrets.CONFLUENCE_TOKEN }}

@@ -8,6 +8,11 @@ on:
         required: false
         type: string
         default: ''
+      dry-run:
+        description: 'Preview what would be published without calling the Confluence API'
+        required: false
+        type: boolean
+        default: false
     secrets:
       confluence_email:
         required: true
@@ -59,8 +64,13 @@ jobs:
             exit 0
           fi
 
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+
           for manifest in $MANIFESTS; do
             echo "::group::Publishing $manifest"
-            node "$SCRIPT" "$manifest"
+            node "$SCRIPT" "$manifest" $DRY_RUN_FLAG
             echo "::endgroup::"
           done
