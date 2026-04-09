@@ -304,21 +304,45 @@ marked.use({
 // Page body assembly
 // ---------------------------------------------------------------------------
 
-function buildPageBody(markdown, meta) {
-  let html = marked.parse(markdown);
+/** Strip the header block that the connector already surfaces in Page Properties. */
+function stripHeader(markdown) {
+  const lines = markdown.split("\n");
+  let i = 0;
+
+  // Skip leading blank lines
+  while (i < lines.length && lines[i].trim() === "") i++;
+
+  // Skip the first H1 heading
+  if (i < lines.length && lines[i].startsWith("# ")) i++;
+
+  // Skip blank lines and **Key:** Value metadata lines
+  while (i < lines.length) {
+    const line = lines[i].trim();
+    if (line === "") { i++; continue; }
+    if (/^\*\*\w[\w\s]*:\*\*/.test(line)) { i++; continue; }
+    break;
+  }
+
+  return lines.slice(i).join("\n");
+}
+
+function convertMarkdown(markdown) {
+  let html = marked.parse(stripHeader(markdown));
   html = rewriteLinks(html);
   html = rewritePanels(html);
   html = rewriteExpand(html);
+  return html;
+}
+
+function buildPageBody(markdown, meta) {
+  const html = convertMarkdown(markdown);
   const props = pagePropertiesMacro(meta);
   return props ? `${props}\n${html}` : html;
 }
 
 /** Build a feature page: properties → Stories section → content. */
 function buildFeaturePageBody(markdown, meta) {
-  let html = marked.parse(markdown);
-  html = rewriteLinks(html);
-  html = rewritePanels(html);
-  html = rewriteExpand(html);
+  const html = convertMarkdown(markdown);
   const props = pagePropertiesMacro(meta);
   const parts = [];
   if (props) parts.push(props);
