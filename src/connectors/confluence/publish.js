@@ -112,10 +112,10 @@ async function getChildPages(baseUrl, parentId) {
   return (data.results ?? []).map((p) => ({ id: p.id, title: p.title }));
 }
 
-/** Search the entire space for a page by title. Returns { id, title } or null. */
+/** Search the entire space for an active page by title. Returns { id, title } or null. */
 async function findPageByTitle(baseUrl, spaceKey, title) {
   const data = await confluenceFetch(
-    `${baseUrl}/wiki/rest/api/content?title=${encodeURIComponent(title)}&spaceKey=${spaceKey}&type=page`,
+    `${baseUrl}/wiki/rest/api/content?title=${encodeURIComponent(title)}&spaceKey=${spaceKey}&type=page&status=current`,
   );
   const results = data.results ?? [];
   return results.length > 0
