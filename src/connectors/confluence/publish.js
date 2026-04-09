@@ -40,9 +40,7 @@ const STORIES_SECTION = `<h2>Stories</h2>
   <ac:parameter ac:name="cql">label = "story" AND parent = currentContent()</ac:parameter>
 </ac:structured-macro>`;
 
-const CHILDREN_MACRO = `\n<ac:structured-macro ac:name="children">
-  <ac:parameter ac:name="all">true</ac:parameter>
-</ac:structured-macro>`;
+const CHILDREN_MACRO = `\n<ac:structured-macro ac:name="children" />`;
 
 // Scale labels: epic (root files), feature (folder pages), story (files inside features)
 // Passed explicitly through the recursion — not derived from depth.
@@ -71,7 +69,7 @@ function requireAuth() {
 // Confluence API helpers
 // ---------------------------------------------------------------------------
 
-async function confluenceFetch(url, options = {}) {
+async function confluenceFetch(url, options = {}, label = "") {
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -83,7 +81,9 @@ async function confluenceFetch(url, options = {}) {
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Confluence API ${res.status}: ${body}`);
+    throw new Error(
+      `Confluence API ${res.status}${label ? ` [${label}]` : ""}: ${body}`,
+    );
   }
   return res.json();
 }
@@ -91,6 +91,8 @@ async function confluenceFetch(url, options = {}) {
 async function getPage(baseUrl, pageId) {
   const data = await confluenceFetch(
     `${baseUrl}/wiki/api/v2/pages/${pageId}?body-format=storage`,
+    {},
+    `getPage ${pageId}`,
   );
   return {
     id: data.id,
@@ -111,6 +113,8 @@ async function getSpaceKey(baseUrl, spaceId) {
 async function getChildPages(baseUrl, parentId) {
   const data = await confluenceFetch(
     `${baseUrl}/wiki/rest/api/content/${parentId}/child/page?limit=250`,
+    {},
+    `getChildPages ${parentId}`,
   );
   return (data.results ?? []).map((p) => ({ id: p.id, title: p.title }));
 }
@@ -120,6 +124,8 @@ async function findPageByTitle(baseUrl, rootPageId, title) {
   const cql = `ancestor=${rootPageId} AND title="${title}" AND type=page`;
   const data = await confluenceFetch(
     `${baseUrl}/wiki/rest/api/content/search?cql=${encodeURIComponent(cql)}&limit=1`,
+    {},
+    `findPageByTitle "${title}"`,
   );
   const results = data.results ?? [];
   return results.length > 0
@@ -128,28 +134,36 @@ async function findPageByTitle(baseUrl, rootPageId, title) {
 }
 
 async function createPage(baseUrl, spaceKey, parentId, title, body) {
-  return confluenceFetch(`${baseUrl}/wiki/rest/api/content`, {
-    method: "POST",
-    body: JSON.stringify({
-      type: "page",
-      title,
-      space: { key: spaceKey },
-      ancestors: [{ id: parentId }],
-      body: { storage: { value: body, representation: "storage" } },
-    }),
-  });
+  return confluenceFetch(
+    `${baseUrl}/wiki/rest/api/content`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        type: "page",
+        title,
+        space: { key: spaceKey },
+        ancestors: [{ id: parentId }],
+        body: { storage: { value: body, representation: "storage" } },
+      }),
+    },
+    `createPage "${title}"`,
+  );
 }
 
 async function updatePage(baseUrl, pageId, title, body, version) {
-  return confluenceFetch(`${baseUrl}/wiki/rest/api/content/${pageId}`, {
-    method: "PUT",
-    body: JSON.stringify({
-      type: "page",
-      title,
-      body: { storage: { value: body, representation: "storage" } },
-      version: { number: version + 1 },
-    }),
-  });
+  return confluenceFetch(
+    `${baseUrl}/wiki/rest/api/content/${pageId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        type: "page",
+        title,
+        body: { storage: { value: body, representation: "storage" } },
+        version: { number: version + 1 },
+      }),
+    },
+    `updatePage "${title}" (${pageId} v${version}→${version + 1})`,
+  );
 }
 
 async function addLabels(baseUrl, pageId, labels) {
@@ -159,6 +173,7 @@ async function addLabels(baseUrl, pageId, labels) {
       method: "POST",
       body: JSON.stringify(labels.map((name) => ({ prefix: "global", name }))),
     },
+    `addLabels ${pageId} [${labels.join(", ")}]`,
   );
 }
 
@@ -335,12 +350,14 @@ async function publishPage(ctx, parentId, childPages, title, body, labels) {
     const page = await getPage(baseUrl, pageId);
     await updatePage(baseUrl, pageId, title, body, page.version);
     await addLabels(baseUrl, pageId, labels);
+    console.log("  Updated: %s (page %s, v%d → v%d)", title, pageId, page.version, page.version + 1);
     ctx.stats.updated++;
     return pageId;
   }
 
   const created = await createPage(baseUrl, spaceKey, parentId, title, body);
   await addLabels(baseUrl, created.id, labels);
+  console.log("  Created: %s (page %s)", title, created.id);
   ctx.stats.created++;
   return created.id;
 }
