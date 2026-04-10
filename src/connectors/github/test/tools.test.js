@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { resolveWorkspace, readArtifacts, saveArtifacts } from "../server.js";
+import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch } from "../server.js";
 
 function mockClient(overrides = {}) {
   const defaults = {
@@ -207,5 +207,51 @@ describe("saveArtifacts", () => {
     assert.equal(result.commit, null);
     assert.equal(result.message, "Nothing to save");
     assert.equal(result.files_changed, 0);
+  });
+});
+
+describe("diffBranch", () => {
+  it("returns changed .aidos/ files with patches", async () => {
+    const client = mockClient({
+      compare: async () => ({
+        files: [
+          { filename: ".aidos/problem.md", status: "modified", additions: 5, deletions: 2, patch: "@@ -1 +1 @@\n-old\n+new" },
+          { filename: ".aidos/solution.md", status: "added", additions: 10, deletions: 0, patch: "@@ -0,0 +1,10 @@\n+content" },
+          { filename: "src/index.js", status: "modified", additions: 1, deletions: 1, patch: "@@ -1 +1 @@\n-x\n+y" },
+        ],
+        ahead_by: 2,
+      }),
+    });
+
+    const result = await diffBranch(client, "org", "my-repo", "aidos/simon", "main");
+
+    assert.equal(result.files.length, 2, "should only include .aidos/ files");
+    assert.ok(result.files.every((f) => f.filename.includes(".aidos/")), "all files should be in .aidos/");
+    assert.equal(result.summary.files_changed, 2);
+    assert.equal(result.summary.additions, 15);
+    assert.equal(result.summary.deletions, 2);
+    assert.equal(result.summary.commits_ahead, 2);
+
+    const first = result.files[0];
+    assert.ok("filename" in first);
+    assert.ok("status" in first);
+    assert.ok("additions" in first);
+    assert.ok("deletions" in first);
+    assert.ok("patch" in first);
+  });
+
+  it("returns empty diff when no changes", async () => {
+    const client = mockClient({
+      compare: async () => ({
+        files: [],
+        ahead_by: 0,
+      }),
+    });
+
+    const result = await diffBranch(client, "org", "my-repo", "aidos/simon", "main");
+
+    assert.equal(result.files.length, 0);
+    assert.equal(result.summary.files_changed, 0);
+    assert.equal(result.summary.commits_ahead, 0);
   });
 });

@@ -184,6 +184,44 @@ export async function saveArtifacts(client, owner, repo, branch, files, message)
   return { commit: newCommit.sha, files_changed: files.length };
 }
 
+/**
+ * Show .aidos/ file diffs between a branch and a target branch.
+ *
+ * @param {object} client - GitHub API client
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @param {string} branch - Source branch (the working branch)
+ * @param {string} target - Target branch to compare against
+ * @returns {{ files: Array, summary: object }}
+ */
+export async function diffBranch(client, owner, repo, branch, target) {
+  const comparison = await client.compare(owner, repo, target, branch);
+
+  const allFiles = comparison.files || [];
+  const files = allFiles
+    .filter((f) => f.filename.includes(".aidos/"))
+    .map((f) => ({
+      filename: f.filename,
+      status: f.status,
+      additions: f.additions,
+      deletions: f.deletions,
+      patch: f.patch,
+    }));
+
+  const additions = files.reduce((sum, f) => sum + f.additions, 0);
+  const deletions = files.reduce((sum, f) => sum + f.deletions, 0);
+
+  return {
+    files,
+    summary: {
+      files_changed: files.length,
+      additions,
+      deletions,
+      commits_ahead: comparison.ahead_by || 0,
+    },
+  };
+}
+
 // ---- Tool registration ----
 
 server.registerTool(
@@ -269,6 +307,28 @@ server.registerTool(
     const { client } = await getClient();
     const [owner, repoName] = repo.split("/");
     const result = await saveArtifacts(client, owner, repoName, branch, files, message);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+server.registerTool(
+  "diff",
+  {
+    title: "Diff AIDOS Branch",
+    description:
+      "Show .aidos/ file changes between a working branch and a target branch. Returns per-file patches and a summary of additions, deletions, and commits ahead.",
+    inputSchema: z.object({
+      repo: z.string().describe("Repository as owner/repo"),
+      branch: z.string().describe("Working branch to diff"),
+      target: z.string().describe("Target branch to compare against (e.g. main)"),
+    }),
+  },
+  async ({ repo, branch, target }) => {
+    const { client } = await getClient();
+    const [owner, repoName] = repo.split("/");
+    const result = await diffBranch(client, owner, repoName, branch, target);
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };
