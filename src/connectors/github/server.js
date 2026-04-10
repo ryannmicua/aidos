@@ -222,6 +222,48 @@ export async function diffBranch(client, owner, repo, branch, target) {
   };
 }
 
+/**
+ * Submit changes via PR or direct push/merge.
+ *
+ * @param {object} client - GitHub API client
+ * @param {string} owner - Repository owner
+ * @param {string} repo - Repository name
+ * @param {string} branch - Working branch to submit
+ * @param {object} opts
+ * @param {string} opts.strategy - "pr" or "push"
+ * @param {string} opts.target - Target branch (e.g. "main")
+ * @param {string[]} [opts.reviewers] - Reviewer logins (@ prefix treated as team)
+ * @param {string} [opts.title] - PR title
+ * @param {string} [opts.body] - PR body
+ * @returns {{ type: "pr", number: number, url: string }|{ type: "push", merge_sha: string, branch_deleted: boolean }}
+ */
+export async function submitChanges(client, owner, repo, branch, opts) {
+  const { strategy, target, reviewers = [], title, body } = opts;
+
+  if (strategy === "pr") {
+    const pr = await client.createPull(owner, repo, { head: branch, base: target, title, body });
+
+    if (reviewers.length > 0) {
+      const individualReviewers = reviewers.filter((r) => !r.startsWith("@"));
+      const teamReviewers = reviewers
+        .filter((r) => r.startsWith("@"))
+        .map((r) => r.slice(1));
+      await client.requestReviewers(owner, repo, pr.number, {
+        reviewers: individualReviewers,
+        team_reviewers: teamReviewers,
+      });
+    }
+
+    return { type: "pr", number: pr.number, url: pr.html_url };
+  }
+
+  // strategy === "push"
+  const mergeResult = await client.merge(owner, repo, target, branch);
+  await client.deleteRef(owner, repo, `heads/${branch}`);
+
+  return { type: "push", merge_sha: mergeResult.sha, branch_deleted: true };
+}
+
 // ---- Tool registration ----
 
 server.registerTool(
@@ -329,6 +371,41 @@ server.registerTool(
     const { client } = await getClient();
     const [owner, repoName] = repo.split("/");
     const result = await diffBranch(client, owner, repoName, branch, target);
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+server.registerTool(
+  "submit",
+  {
+    title: "Submit AIDOS Changes",
+    description:
+      "Submit working branch changes via pull request (pr) or direct merge and delete (push). For pr strategy, optional reviewers can be provided as logins; @-prefixed values are treated as team slugs.",
+    inputSchema: z.object({
+      repo: z.string().describe("Repository as owner/repo"),
+      branch: z.string().describe("Working branch to submit"),
+      target: z.string().describe("Target branch (e.g. main)"),
+      strategy: z.enum(["pr", "push"]).describe("Submission strategy: pr or push"),
+      reviewers: z
+        .array(z.string())
+        .default([])
+        .describe("Reviewer logins for PR strategy (@ prefix for team slugs)"),
+      title: z.string().optional().describe("PR title (pr strategy only)"),
+      body: z.string().optional().describe("PR body (pr strategy only)"),
+    }),
+  },
+  async ({ repo, branch, target, strategy, reviewers, title, body }) => {
+    const { client } = await getClient();
+    const [owner, repoName] = repo.split("/");
+    const result = await submitChanges(client, owner, repoName, branch, {
+      strategy,
+      target,
+      reviewers,
+      title,
+      body,
+    });
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
     };

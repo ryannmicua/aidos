@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch } from "../server.js";
+import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch, submitChanges } from "../server.js";
 
 function mockClient(overrides = {}) {
   const defaults = {
@@ -253,5 +253,86 @@ describe("diffBranch", () => {
     assert.equal(result.files.length, 0);
     assert.equal(result.summary.files_changed, 0);
     assert.equal(result.summary.commits_ahead, 0);
+  });
+});
+
+describe("submitChanges", () => {
+  it("creates PR with reviewers when strategy is pr", async () => {
+    let createPullArgs;
+    let requestReviewersArgs;
+
+    const client = mockClient({
+      createPull: async (owner, repo, opts) => {
+        createPullArgs = { owner, repo, opts };
+        return { number: 42, html_url: "https://github.com/org/my-repo/pull/42" };
+      },
+      requestReviewers: async (owner, repo, pullNumber, reviewers) => {
+        requestReviewersArgs = { owner, repo, pullNumber, reviewers };
+        return {};
+      },
+    });
+
+    const result = await submitChanges(client, "org", "my-repo", "aidos/simon", {
+      strategy: "pr",
+      target: "main",
+      reviewers: ["alice", "bob"],
+      title: "Add problem statement",
+      body: "Initial problem doc",
+    });
+
+    assert.equal(result.type, "pr");
+    assert.equal(result.number, 42);
+    assert.equal(result.url, "https://github.com/org/my-repo/pull/42");
+    assert.ok(createPullArgs, "createPull should be called");
+    assert.ok(requestReviewersArgs, "requestReviewers should be called");
+  });
+
+  it("merges and deletes branch when strategy is push", async () => {
+    let mergeCalled = false;
+    let deleteRefCalled = false;
+
+    const client = mockClient({
+      merge: async () => {
+        mergeCalled = true;
+        return { sha: "merge-sha-abc" };
+      },
+      deleteRef: async () => {
+        deleteRefCalled = true;
+        return {};
+      },
+    });
+
+    const result = await submitChanges(client, "org", "my-repo", "aidos/simon", {
+      strategy: "push",
+      target: "main",
+      reviewers: [],
+    });
+
+    assert.equal(result.type, "push");
+    assert.equal(result.merge_sha, "merge-sha-abc");
+    assert.equal(result.branch_deleted, true);
+    assert.ok(mergeCalled, "merge should be called");
+    assert.ok(deleteRefCalled, "deleteRef should be called");
+  });
+
+  it("skips reviewers when none specified", async () => {
+    let requestReviewersCalled = false;
+
+    const client = mockClient({
+      createPull: async () => ({ number: 7, html_url: "https://github.com/org/my-repo/pull/7" }),
+      requestReviewers: async () => {
+        requestReviewersCalled = true;
+        return {};
+      },
+    });
+
+    await submitChanges(client, "org", "my-repo", "aidos/simon", {
+      strategy: "pr",
+      target: "main",
+      reviewers: [],
+      title: "Empty reviewers test",
+    });
+
+    assert.equal(requestReviewersCalled, false, "requestReviewers should NOT be called when no reviewers");
   });
 });
