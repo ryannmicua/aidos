@@ -11,7 +11,7 @@ export function createClient(token, fetchFn = fetch) {
     const url = path.startsWith("http") ? path : `${API}${path}`;
     console.error(`  GitHub API: ${method} ${path}${label ? ` [${label}]` : ""}`);
 
-    // Retry with exponential backoff on rate limit (403 with retry-after or 429)
+    // Retry up to 3 times on rate limit (429 or 403 with Retry-After header)
     for (let attempt = 0; attempt < 3; attempt++) {
       const res = await fetchFn(url, {
         method,
@@ -46,8 +46,6 @@ export function createClient(token, fetchFn = fetch) {
       api("GET", `/search/repositories?q=${encodeURIComponent(query)}&per_page=10`, null, "searchRepos"),
     getRepo: (owner, repo) =>
       api("GET", `/repos/${owner}/${repo}`, null, "getRepo"),
-    listBranches: (owner, repo, prefix = "") =>
-      api("GET", `/repos/${owner}/${repo}/branches?per_page=100`, null, "listBranches"),
     getBranch: (owner, repo, branch) =>
       api("GET", `/repos/${owner}/${repo}/branches/${encodeURIComponent(branch)}`, null, "getBranch"),
     createBranch: (owner, repo, name, sha) =>
@@ -64,18 +62,13 @@ export function createClient(token, fetchFn = fetch) {
       api("POST", `/repos/${owner}/${repo}/git/commits`, { message, tree, parents }, "createCommit"),
     updateRef: (owner, repo, branch, sha) =>
       api("PATCH", `/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, { sha }, "updateRef"),
-    getContents: (owner, repo, path, ref) =>
-      api("GET", `/repos/${owner}/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`, null, `getContents ${path}`),
     merge: (owner, repo, base, head, message) =>
       api("POST", `/repos/${owner}/${repo}/merges`, { base, head, commit_message: message }, "merge"),
     compare: (owner, repo, base, head) =>
       api("GET", `/repos/${owner}/${repo}/compare/${encodeURIComponent(base)}...${encodeURIComponent(head)}`, null, "compare"),
-    createPull: (owner, repo, title, body, head, base) =>
-      api("POST", `/repos/${owner}/${repo}/pulls`, { title, body, head, base }, "createPull"),
-    requestReviewers: (owner, repo, pullNumber, reviewers, teamReviewers) =>
-      api("POST", `/repos/${owner}/${repo}/pulls/${pullNumber}/requested_reviewers`, {
-        reviewers: reviewers || [],
-        team_reviewers: teamReviewers || [],
-      }, "requestReviewers"),
+    createPull: (owner, repo, opts) =>
+      api("POST", `/repos/${owner}/${repo}/pulls`, opts, "createPull"),
+    requestReviewers: (owner, repo, pullNumber, opts) =>
+      api("POST", `/repos/${owner}/${repo}/pulls/${pullNumber}/requested_reviewers`, opts, "requestReviewers"),
   };
 }

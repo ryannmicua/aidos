@@ -8,7 +8,6 @@ function mockClient(overrides = {}) {
     searchRepos: async () => ({ items: [{ full_name: "org/my-repo", default_branch: "main" }] }),
     getRepo: async (o, r) => ({ full_name: `${o}/${r}`, default_branch: "main" }),
     getBranch: async () => { throw new Error("GitHub API 404"); },
-    listBranches: async () => [],
     createBranch: async () => ({ ref: "refs/heads/aidos/simon" }),
     getTree: async () => ({
       sha: "root",

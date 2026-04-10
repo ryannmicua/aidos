@@ -48,8 +48,8 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
     try {
       await client.merge(owner, repo, branchName, defaultBranch, `Sync ${defaultBranch} into ${branchName}`);
     } catch (err) {
-      // 409 = conflict, 204 = already up to date — both are acceptable
-      if (!err.message.includes("409") && !err.message.includes("204")) {
+      // 409 = conflict — already up to date is acceptable too (merge returns null on 204, no throw)
+      if (!err.message.includes("409")) {
         // Not a known benign error — still continue, sync is best-effort
         console.error(`Merge warning: ${err.message}`);
       }
@@ -179,7 +179,7 @@ export async function saveArtifacts(client, owner, repo, branch, files, message)
   const newTree = await client.createTree(owner, repo, baseTree.sha, treeEntries);
   const commitMessage = `[aidos] ${message}`;
   const newCommit = await client.createCommit(owner, repo, commitMessage, newTree.sha, [headSha]);
-  await client.updateRef(owner, repo, `heads/${branch}`, newCommit.sha);
+  await client.updateRef(owner, repo, branch, newCommit.sha);
 
   return { commit: newCommit.sha, files_changed: files.length };
 }
@@ -259,7 +259,7 @@ export async function submitChanges(client, owner, repo, branch, opts) {
 
   // strategy === "push"
   const mergeResult = await client.merge(owner, repo, target, branch);
-  await client.deleteRef(owner, repo, `heads/${branch}`);
+  await client.deleteRef(owner, repo, branch);
 
   return { type: "push", merge_sha: mergeResult.sha, branch_deleted: true };
 }

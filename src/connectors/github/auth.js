@@ -50,9 +50,9 @@ export async function deviceFlow(fetchFn = fetch) {
   console.error(instructions);
 
   // Step 2: Poll for token
-  const pollInterval = (interval || 5) * 1000;
+  let currentInterval = (interval ?? 5) * 1000;
   while (true) {
-    await new Promise((r) => setTimeout(r, pollInterval));
+    await new Promise((r) => setTimeout(r, currentInterval));
 
     const tokenRes = await fetchFn(
       "https://github.com/login/oauth/access_token",
@@ -74,7 +74,7 @@ export async function deviceFlow(fetchFn = fetch) {
     if (data.access_token) return data;
     if (data.error === "authorization_pending") continue;
     if (data.error === "slow_down") {
-      await new Promise((r) => setTimeout(r, 5000));
+      currentInterval += 5000;
       continue;
     }
     throw new Error(`Device flow error: ${data.error} — ${data.error_description}`);
