@@ -39,6 +39,7 @@ describe("token cache", () => {
 
 describe("deviceFlow", () => {
   it("returns token after successful device flow", async () => {
+    process.env.AIDOS_GITHUB_CLIENT_ID = "Iv23li_test_client_id";
     const mockFetch = async (url, opts) => {
       if (url.includes("/login/device/code")) {
         return {
@@ -63,5 +64,15 @@ describe("deviceFlow", () => {
     const { deviceFlow } = await import("../auth.js");
     const result = await deviceFlow(mockFetch);
     assert.equal(result.access_token, "gho_test");
+    delete process.env.AIDOS_GITHUB_CLIENT_ID;
+  });
+
+  it("throws clear error when AIDOS_GITHUB_CLIENT_ID is not set", async () => {
+    delete process.env.AIDOS_GITHUB_CLIENT_ID;
+    const { deviceFlow } = await import("../auth.js");
+    await assert.rejects(
+      () => deviceFlow(async () => ({ ok: true, json: async () => ({}) })),
+      /AIDOS_GITHUB_CLIENT_ID/,
+    );
   });
 });

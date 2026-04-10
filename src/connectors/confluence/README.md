@@ -104,11 +104,15 @@ Confluence search, CQL filtering, and dashboard reports.
 
 ## Prerequisites
 
-- **Confluence Cloud** (not Server/Data Center)
+- **Confluence Cloud** (not Server/Data Center) — your URL looks like
+  `https://<your-org>.atlassian.net`
+- **Node.js 20+** for local testing
 - A Confluence **API token** — generate at
   https://id.atlassian.com/manage-profile/security/api-tokens
-- A **root page** in your Confluence space — create one manually, copy its
-  page ID from the URL (the numeric ID in `…/pages/123456789/…`)
+- A **root page** in your Confluence space — create one manually in
+  Confluence, then copy its page ID from the browser URL. For a page at
+  `https://acme.atlassian.net/wiki/spaces/ENG/pages/123456789/My+Root+Page`,
+  the page ID is `123456789`.
 
 ## Manifest
 
@@ -196,18 +200,21 @@ jobs:
       confluence_token: ${{ secrets.CONFLUENCE_TOKEN }}
 ```
 
-Then add `CONFLUENCE_EMAIL` and `CONFLUENCE_TOKEN` as repository secrets.
+Then add `CONFLUENCE_EMAIL` and `CONFLUENCE_TOKEN` as repository secrets:
+**Settings → Secrets and variables → Actions → New repository secret**.
 
 If your repo has multiple `.aidos/` folders, omit `manifest-path` and the
 workflow will auto-discover all `manifest.json` files.
 
 ## Local Testing
 
-Run the script with `--dry-run` to see the page hierarchy and converted
-bodies without calling the Confluence API:
+Install dependencies once, then run the script with `--dry-run` to see the
+page hierarchy and converted bodies without calling the Confluence API:
 
 ```bash
-node src/connectors/confluence/publish.js .aidos/manifest.json --dry-run
+cd src/connectors/confluence
+npm install
+node publish.js ../../../.aidos/manifest.json --dry-run
 ```
 
 No authentication is required for dry-run. Output shows:

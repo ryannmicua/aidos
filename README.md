@@ -119,6 +119,19 @@ For Claude-specific setup — how to connect GitHub, invoke skills, and configur
 
 ---
 
+## Connectors
+
+Two optional connectors close the loop between AI authoring and the rest of your delivery toolchain:
+
+| Connector | Purpose | Setup |
+|---|---|---|
+| **GitHub MCP** | A local MCP server that lets non-coders read, edit, and submit `.aidos/` artifacts via Claude Desktop without ever touching Git. Resolves repos, manages a personal `aidos/{username}` working branch, and creates PRs per project policy. | [`src/connectors/github/README.md`](src/connectors/github/README.md) |
+| **Confluence Publish** | A GitHub Actions workflow that publishes `.aidos/` folders to Confluence on every push. Translates markdown to Confluence storage format, mirrors folder hierarchy as page hierarchy, and skips unchanged pages via content hashing. | [`src/connectors/confluence/README.md`](src/connectors/confluence/README.md) |
+
+The two connectors are independent. Use either, both, or neither.
+
+---
+
 ## What's in the Repo
 
 ```

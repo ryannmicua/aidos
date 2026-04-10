@@ -1,62 +1,43 @@
 # Claude Setup for AIDOS
 
 AIDOS skills and prompts are agent-agnostic. This file covers Claude-specific
-setup: connecting GitHub so Claude can read and write AIDOS artifacts directly,
-and how to invoke the builder and auditor skills.
+setup: connecting GitHub so Claude can read and write AIDOS artifacts, and
+how to invoke the builder and auditor skills.
 
 ## Connecting GitHub
 
-AIDOS uses GitHub as its artifact store. To enable read/write access from
-claude.ai:
+AIDOS uses GitHub as its artifact store. The **AIDOS GitHub MCP connector**
+is a local MCP server that gives Claude (Desktop, AI, Code) read/write access
+to `.aidos/` folders in any GitHub repo you have access to. It handles
+discovery, branching, saving, and PR creation.
 
-**Step 1 — Create a GitHub OAuth App**
+**Setup:** see [`src/connectors/github/README.md`](src/connectors/github/README.md)
+for the full walkthrough — registering a GitHub OAuth App with Device Flow,
+installing the connector, and adding it to `claude_desktop_config.json`.
 
-- GitHub → Settings → Developer Settings → OAuth Apps → New OAuth App
-- **Application name:** `Claude GitHub MCP` — users will see this name
-  when authorising. It describes what it is: Claude connecting to GitHub.
-- **Homepage URL:** your AIDOS repo e.g. `https://github.com/yourname/aidos`
-- **Authorization callback URL:** `https://claude.ai/api/mcp/auth_callback`
-- Do not enable Device Flow
-- Register the app, then click **Generate a new client secret** — copy it
-  immediately, you only see it once
-
-**Step 2 — Add a custom connector in claude.ai**
-
-- Settings → Connectors → Add custom connector
-- **Name:** `GitHub MCP`
-- **URL:** `https://api.githubcopilot.com/mcp`
-- Advanced settings → paste your OAuth Client ID and Client Secret
-- Hit Add — complete the GitHub OAuth consent screen when it appears
-
-**Step 3 — Restrict tools to the minimal set**
-
-When prompted to configure tool permissions, enable only:
-
-Read:
-- Get file or directory contents
-- List branches
-- List commits
-- List pull requests
-- Get details for a single pull request
-- Search code
-- Search repositories
-
-Write:
-- Create branch
-- Create or update file
-- Open new pull request
-- Push files to repository
-- Delete file
-
-Block everything else.
+Once configured, the 5 AIDOS tools (`open_workspace`, `read_artifacts`,
+`save`, `diff`, `submit`) become available in any Claude Desktop session.
 
 ## Invoking the Skills
 
-Enable the GitHub MCP connector for your session via the tools menu,
-then invoke the skill:
+After the connector is configured, invoke either skill:
 
-   /aidos-builder   — scaffold and iterate on delivery artifacts
-   /aidos-auditor   — audit an artifact against the rubrics
+```
+/aidos-builder   — scaffold and iterate on delivery artifacts
+/aidos-auditor   — audit an artifact against the rubrics
+```
 
-The skill loads automatically and will check for existing aidos/ branches
-on your repo at the start of each session.
+The skill loads automatically. At session start it asks which repo to work on,
+calls `open_workspace` to create or sync your `aidos/{username}` branch, and
+loads existing artifacts via `read_artifacts`. From there you build or audit
+in the conversation, then `save` checkpoints and `submit` opens a PR (or
+direct merge, per the manifest's `write` config).
+
+## Publishing to Confluence (optional)
+
+If you want artifacts to publish to Confluence on every push, set up the
+**Confluence connector** as a GitHub Actions workflow in your repo:
+[`src/connectors/confluence/README.md`](src/connectors/confluence/README.md).
+
+The two connectors are independent: GitHub for authoring, Confluence for
+publishing. You can use either, both, or neither.

@@ -4,10 +4,22 @@ import { homedir } from "node:os";
 
 const DEFAULT_AUTH_PATH = join(homedir(), ".aidos", "auth.json");
 
-// GitHub OAuth App client ID — registered under the AIDOS GitHub account.
-// Device flow does not use a client secret.
-const CLIENT_ID = "REPLACE_WITH_REAL_CLIENT_ID";
+// GitHub OAuth App client ID — set via AIDOS_GITHUB_CLIENT_ID environment variable.
+// Each user/org registers their own OAuth App with Device Flow enabled.
+// See README.md for setup instructions.
 const SCOPES = "repo read:org";
+
+function getClientId() {
+  const id = process.env.AIDOS_GITHUB_CLIENT_ID;
+  if (!id) {
+    throw new Error(
+      "AIDOS_GITHUB_CLIENT_ID environment variable is required. " +
+      "Register a GitHub OAuth App with Device Flow enabled and set the Client ID. " +
+      "See src/connectors/github/README.md for setup instructions.",
+    );
+  }
+  return id;
+}
 
 // ---- Token cache ----
 
@@ -30,6 +42,7 @@ export async function saveToken(path = DEFAULT_AUTH_PATH, token) {
 // ---- Device flow ----
 
 export async function deviceFlow(fetchFn = fetch) {
+  const clientId = getClientId();
   // Step 1: Request device code
   const codeRes = await fetchFn("https://github.com/login/device/code", {
     method: "POST",
@@ -37,7 +50,7 @@ export async function deviceFlow(fetchFn = fetch) {
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ client_id: CLIENT_ID, scope: SCOPES }),
+    body: JSON.stringify({ client_id: clientId, scope: SCOPES }),
   });
   if (!codeRes.ok) {
     throw new Error(`Device flow initiation failed: ${codeRes.status}`);
@@ -63,7 +76,7 @@ export async function deviceFlow(fetchFn = fetch) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          client_id: CLIENT_ID,
+          client_id: clientId,
           device_code,
           grant_type: "urn:ietf:params:oauth:grant-type:device_code",
         }),
