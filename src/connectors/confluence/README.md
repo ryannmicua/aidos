@@ -1,24 +1,88 @@
 # AIDOS Confluence Connector
 
-One-way publish of AIDOS artifacts from a `.aidos/` folder to Confluence.
-The repository is source of truth. Confluence is a read-only projection.
+A GitHub Actions workflow that publishes AIDOS artifacts from a `.aidos/` folder to Confluence on every push.
 
-## How It Works
+One-way publish. The repository is source of truth; Confluence is a read-only projection. Folders become pages, markdown translates to Confluence storage format with native macros, and unchanged pages are skipped via content hashing.
 
-The publish script recursively walks the `.aidos/` directory, converts each
-markdown file to Confluence storage format (XHTML), and mirrors the folder
-structure as a page hierarchy in Confluence.
+---
 
-- **Folders become pages** — subdirectories create parent pages with their
-  contents as child pages
-- **Status and Owner** are parsed from each file's metadata lines and
-  rendered as a Confluence Page Properties table
-- **Pages are matched by title** — no IDs stored in the manifest. Delete a
-  page in Confluence, re-sync, it recreates cleanly.
-- The **root page** gets a Page Properties Report macro that aggregates all
-  descendant statuses into a dashboard table
+## Prerequisites
 
-## Git → Confluence Mapping
+- **Confluence Cloud** (not Server/Data Center) — your URL looks like `https://<your-org>.atlassian.net`
+- **Node.js 20+** (only if you want to run the script locally for dry-runs)
+- A Confluence **API token** — generate at https://id.atlassian.com/manage-profile/security/api-tokens
+- A **root page** in your Confluence space — create one manually, copy its page ID from the browser URL. For a page at `https://acme.atlassian.net/wiki/spaces/ENG/pages/123456789/My+Root+Page`, the page ID is `123456789`.
+- A **GitHub repo** with a `.aidos/` folder containing artifacts you want to publish
+
+## Install
+
+### Step 1 — Add the publish workflow to your repo
+
+Create `.github/workflows/confluence-publish.yml` in your consuming repo:
+
+```yaml
+name: Publish AIDOS to Confluence
+on:
+  pull_request:
+    paths: ['.aidos/**']
+  push:
+    branches: [main]
+    paths: ['.aidos/**']
+  workflow_dispatch:
+
+jobs:
+  publish:
+    uses: shobman/aidos/.github/workflows/confluence-publish.yml@main
+    with:
+      manifest-path: .aidos/manifest.json
+      dry-run: ${{ github.event_name == 'pull_request' }}
+    secrets:
+      confluence_email: ${{ secrets.CONFLUENCE_EMAIL }}
+      confluence_token: ${{ secrets.CONFLUENCE_TOKEN }}
+```
+
+PRs dry-run (preview in the Actions log), merges to main publish for real.
+
+If your repo has multiple `.aidos/` folders (e.g. a monorepo), omit `manifest-path` and the workflow will auto-discover all `manifest.json` files.
+
+### Step 2 — Add GitHub Actions secrets
+
+In your consuming repo: **Settings → Secrets and variables → Actions → New repository secret**.
+
+Add both:
+
+- `CONFLUENCE_EMAIL` — the email address associated with your Atlassian account
+- `CONFLUENCE_TOKEN` — the API token you generated in Prerequisites
+
+### Step 3 — Add `.aidos/manifest.json` to your repo
+
+Place a `manifest.json` in your `.aidos/` folder:
+
+```json
+{
+  "publish": {
+    "confluence": {
+      "baseUrl": "https://example.atlassian.net",
+      "rootPageId": "123456789"
+    }
+  }
+}
+```
+
+Two required fields. The script discovers artifacts automatically, parses metadata from each file, and derives the Confluence space from the root page.
+
+### Step 4 — Push and verify
+
+Commit the workflow file and manifest, push to main. The Actions tab should show the workflow running. When it completes, your artifacts appear as child pages under the root page in Confluence.
+
+## Use
+
+Once installed, the workflow runs automatically on every push to `.aidos/**`:
+
+- **PRs** run in `--dry-run` mode — full preview in the Actions log, no Confluence changes
+- **Merges to main** publish for real
+
+### Git → Confluence mapping
 
 ```
 .aidos/                          Root Page (Dashboard)
@@ -50,17 +114,9 @@ structure as a page hierarchy in Confluence.
 | Folder has no matching `.md` file (`refs/`) | Auto-generated page with title + Children macro. All `.md` files inside become child pages. |
 | Any depth of nesting | Fully recursive — nest as deep as you need. |
 
-Page titles are derived from filenames: strip `.md`, split on `-`,
-title-case each word. `tech-design.md` becomes **Tech Design**.
+Page titles are derived from filenames: strip `.md`, split on `-`, title-case each word. `tech-design.md` becomes **Tech Design**.
 
-If your Confluence space has existing pages with common titles (Problem,
-Testing, etc.), use `titleTemplate` in the manifest to prefix all titles.
-See [Manifest](#manifest).
-
-## Markdown → Confluence Translation
-
-The connector translates standard markdown features into native Confluence
-macros for a rich reading experience.
+### Markdown → Confluence translation
 
 | Markdown | Confluence | Notes |
 |----------|-----------|-------|
@@ -75,18 +131,7 @@ macros for a rich reading experience.
 | `<details><summary>Title</summary>` | Expand/collapse macro | Collapsible sections |
 | Tables, lists, headings, bold, italic | Standard HTML equivalents | Passed through cleanly |
 
-### Status lozenge colours
-
-| Status | Colour |
-|--------|--------|
-| Not Started | Grey |
-| Draft | Yellow |
-| In Progress | Blue |
-| Review | Purple |
-| Done | Green |
-| Blocked | Red |
-
-Status matching is case-insensitive. Unrecognised values default to Grey.
+**Status lozenge colours:** Not Started → Grey, Draft → Yellow, In Progress → Blue, Review → Purple, Done → Green, Blocked → Red. Unrecognised values default to Grey.
 
 ### Labels
 
@@ -98,44 +143,11 @@ Every published page gets labels automatically:
 | Scale | Inferred from directory structure: root files → `epic`, folder pages → `feature`, their children → `story` |
 | `aidos` | Always applied — identifies connector-managed pages |
 
-Scale labels power the root dashboard (separate Epics and Features
-tables) and the Stories section on feature pages. Labels enable
-Confluence search, CQL filtering, and dashboard reports.
+Scale labels power the root dashboard (separate Epics and Features tables) and the Stories section on feature pages. Labels enable Confluence search, CQL filtering, and dashboard reports.
 
-## Prerequisites
+### Title template (optional)
 
-- **Confluence Cloud** (not Server/Data Center) — your URL looks like
-  `https://<your-org>.atlassian.net`
-- **Node.js 20+** for local testing
-- A Confluence **API token** — generate at
-  https://id.atlassian.com/manage-profile/security/api-tokens
-- A **root page** in your Confluence space — create one manually in
-  Confluence, then copy its page ID from the browser URL. For a page at
-  `https://acme.atlassian.net/wiki/spaces/ENG/pages/123456789/My+Root+Page`,
-  the page ID is `123456789`.
-
-## Manifest
-
-Place a `manifest.json` in your `.aidos/` folder:
-
-```json
-{
-  "publish": {
-    "confluence": {
-      "baseUrl": "https://example.atlassian.net",
-      "rootPageId": "123456789"
-    }
-  }
-}
-```
-
-That's it. Two fields. The script discovers files automatically, parses
-metadata from each file, and derives the Confluence space from the root page.
-
-### Title template
-
-If your Confluence space has existing pages with common names, add a
-`titleTemplate` to prefix all page titles and avoid collisions:
+If your Confluence space has existing pages with common names, add a `titleTemplate` to prefix all page titles and avoid collisions:
 
 ```json
 {
@@ -149,15 +161,15 @@ If your Confluence space has existing pages with common names, add a
 }
 ```
 
-`%title%` is replaced with the title derived from each filename.
-Cross-artifact links (`[Solution](solution.md)`) are rewritten to use
-the templated title so Confluence can resolve them.
+`%title%` is replaced with the title derived from each filename. Cross-artifact links (`[Solution](solution.md)`) are rewritten to use the templated title so Confluence can resolve them.
 
 | Template | `problem.md` becomes |
 |----------|---------------------|
 | `%title%` (default) | Problem |
 | `(CW) %title%` | (CW) Problem |
 | `CW.Core - %title%` | CW.Core - Problem |
+
+### Multiple publish targets
 
 To add more targets later, add another key under `publish`:
 
@@ -174,50 +186,59 @@ Each connector reads only its own key and ignores the rest.
 
 Validate your manifest against `manifest.schema.json` in this directory.
 
-## GitHub Actions Workflow
+## Develop
 
-Add this workflow to your consuming repo. PRs dry-run (preview in the
-Actions log), merges to main publish for real:
+### Get the code
 
-```yaml
-name: Publish AIDOS to Confluence
-on:
-  pull_request:
-    paths: ['.aidos/**']
-  push:
-    branches: [main]
-    paths: ['.aidos/**']
-  workflow_dispatch:
-
-jobs:
-  publish:
-    uses: shobman/aidos/.github/workflows/confluence-publish.yml@main
-    with:
-      manifest-path: .aidos/manifest.json
-      dry-run: ${{ github.event_name == 'pull_request' }}
-    secrets:
-      confluence_email: ${{ secrets.CONFLUENCE_EMAIL }}
-      confluence_token: ${{ secrets.CONFLUENCE_TOKEN }}
+```bash
+git clone https://github.com/shobman/aidos.git
+cd aidos/src/connectors/confluence
+npm install
 ```
 
-Then add `CONFLUENCE_EMAIL` and `CONFLUENCE_TOKEN` as repository secrets:
-**Settings → Secrets and variables → Actions → New repository secret**.
+Only one dependency (`marked` for markdown parsing). No test suite — the connector has been production-tested by running against real Confluence spaces.
 
-If your repo has multiple `.aidos/` folders, omit `manifest-path` and the
-workflow will auto-discover all `manifest.json` files.
+### Local dry-run
 
-## Local Testing
-
-Install dependencies once, then run the script with `--dry-run` to see the
-page hierarchy and converted bodies without calling the Confluence API:
+The script has a built-in dry-run mode that previews the full page hierarchy and converted bodies without calling the Confluence API. No authentication required.
 
 ```bash
 cd src/connectors/confluence
-npm install
 node publish.js ../../../.aidos/manifest.json --dry-run
 ```
 
-No authentication is required for dry-run. Output shows:
+(Point the manifest path at any `.aidos/manifest.json` you want to test against. The command above assumes you're running from the connector directory and testing the repo's own `.aidos/` folder.)
+
+Output shows:
+
 - Page hierarchy with indentation matching Confluence nesting
 - Properties and labels for each page
 - Whether each folder page is sourced from a `.md` file or auto-generated
+
+### Live local run
+
+For a real publish run from your machine (not GitHub Actions), set credentials in the environment:
+
+```bash
+export CONFLUENCE_EMAIL=you@example.com
+export CONFLUENCE_TOKEN=your-api-token
+node publish.js ../../../.aidos/manifest.json
+```
+
+Use this only when you need to debug publish behaviour outside CI — the canonical publish path is the GitHub Actions workflow.
+
+### Project structure
+
+```
+src/connectors/confluence/
+├── publish.js              ← Single entry point — walks .aidos/, converts markdown, publishes
+├── manifest.schema.json    ← JSON Schema for .aidos/manifest.json
+├── package.json            ← { "type": "module", dependencies: { "marked": "..." } }
+└── README.md               ← This file
+```
+
+The script is ~700 lines, self-contained, ESM, uses Node 20+ built-in fetch. Follow the structure (constants → auth → API helpers → markdown transforms → publish logic → main).
+
+### Versioning
+
+No semver. The connector is versioned alongside the aidos repo. The GitHub Actions workflow pulls from `shobman/aidos@main` (or a pinned tag if you want stability). Bump the `CONNECTOR_VERSION` constant in `publish.js` to force republish of all pages — useful after output format changes.

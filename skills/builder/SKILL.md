@@ -35,30 +35,46 @@ When the user describes work they want to deliver, you:
 | `templates/retrospective.md` | Retrospective template for rubric evolution. |
 | `CONTRIBUTING.md` | How to propose rubric changes — the contribution model for evolving the framework. |
 
-## GitHub Workflow Rules
+## Environment
+
+This skill runs in multiple environments. Inspect what's available and use the right surface:
+
+- **AIDOS GitHub MCP Connector (Claude Desktop).** Tools like `open_workspace`, `read_artifacts`, `save`, `diff`, `submit` are available. Use them for all repo operations. The connector manages a per-user `aidos/{username}` working branch and handles PR creation per the manifest's write strategy.
+- **Direct filesystem access (Claude Code).** Read and write `.aidos/` files directly. Honour any local Git conventions the user has.
+- **Plain chat (no repo access).** Work with files the user pastes in. Render artifacts inline for copy-out.
+
+Don't name specific MCP tools in your responses — just use whatever's there. The environment decides.
+
+## Workflow Rules
 
 1. **BATCH READS UPFRONT**
-   Read all required files from GitHub in a single pass before building
-   anything. Do not make incremental MCP calls during artifact construction
-   or review.
+   Read all required files in a single pass before building anything. Do
+   not make incremental reads during artifact construction or review.
 
 2. **PRESENT BEFORE COMMIT**
    After building or updating an artifact, always render the full markdown
    inline in the chat. This is the primary review surface — the user should
    never need to open a browser to review work in progress.
    The user decides when to commit and when to push. Never auto-commit.
-   Never auto-PR. Wait for explicit instruction.
+   Never auto-submit. Wait for explicit instruction.
 
-3. **BRANCHING**
-   Never commit directly to main or the default branch.
-   Never invent a branch name.
-   At the start of a session, check what `aidos/` branches already exist
-   on the repo and present them to the user. Let the user decide whether
-   to continue on an existing branch or create a new one. Ask what to
-   call it if creating new.
+3. **BRANCHING (when a repo is available)**
+   Never commit directly to main or the default branch. In the MCP environment
+   the connector handles branching — use its workspace tool which resolves
+   your per-user `aidos/{username}` branch. In the filesystem environment,
+   check existing `aidos/*` branches and let the user decide which to use.
 
-4. **PULL REQUESTS**
-   When the user asks to open a PR, ask where it should target before
-   creating it. Do not assume main, master, or develop.
+4. **PULL REQUESTS / SUBMIT**
+   When the user asks to open a PR or submit, check the `.aidos/manifest.json`
+   for the write target. If no manifest or no target specified, ask the user
+   where it should go. Do not assume main, master, or develop.
+
+5. **PUBLISH SIDE-EFFECTS**
+   Before the user submits, check the `.aidos/manifest.json` for a `publish.*`
+   section (e.g. `publish.confluence`). If present, tell the user what will
+   happen: *"When this merges to `<target>`, the Confluence connector will
+   publish these artifacts to `<baseUrl>/pages/<rootPageId>` automatically."*
+   Get their acknowledgement before submitting. Non-technical users should
+   never be surprised by where their draft ends up.
 
 Start by reading `builder-prompt.md`, then follow its Session Start instructions.
