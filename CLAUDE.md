@@ -1,62 +1,37 @@
 # Claude Setup for AIDOS
 
-AIDOS skills and prompts are agent-agnostic. This file covers Claude-specific
-setup: connecting GitHub so Claude can read and write AIDOS artifacts directly,
-and how to invoke the builder and auditor skills.
+AIDOS is agent-agnostic. This file covers Claude-specific setup — the combinations of components that work together with Claude (Claude.ai, Claude Code, Claude Desktop).
 
-## Connecting GitHub
+## Pick your setup
 
-AIDOS uses GitHub as its artifact store. To enable read/write access from
-claude.ai:
+| You want to... | Set up |
+|---|---|
+| Use AIDOS as a Claude Skill in Claude.ai or Claude Code | [Skills](skills/README.md) — download the ZIPs, upload or extract |
+| Give Claude Desktop read/write access to `.aidos/` folders in GitHub repos | [GitHub MCP Connector](src/connectors/github/README.md) — local MCP server with Device Flow auth |
+| Auto-publish artifacts to Confluence on merge | [Confluence Publish Connector](src/connectors/confluence/README.md) — GitHub Actions workflow |
+| Use the framework directly without a skill | [Framework](src/README.md) — paste the prompts into any Claude session |
 
-**Step 1 — Create a GitHub OAuth App**
+All four are independent. The most common non-coder setup is **Skills + GitHub MCP Connector + Confluence Publish**: author via Claude Desktop, merge opens a PR, merge publishes to Confluence.
 
-- GitHub → Settings → Developer Settings → OAuth Apps → New OAuth App
-- **Application name:** `Claude GitHub MCP` — users will see this name
-  when authorising. It describes what it is: Claude connecting to GitHub.
-- **Homepage URL:** your AIDOS repo e.g. `https://github.com/yourname/aidos`
-- **Authorization callback URL:** `https://claude.ai/api/mcp/auth_callback`
-- Do not enable Device Flow
-- Register the app, then click **Generate a new client secret** — copy it
-  immediately, you only see it once
+## Skill invocation
 
-**Step 2 — Add a custom connector in claude.ai**
+After installing the Skills (see [`skills/README.md`](skills/README.md)):
 
-- Settings → Connectors → Add custom connector
-- **Name:** `GitHub MCP`
-- **URL:** `https://api.githubcopilot.com/mcp`
-- Advanced settings → paste your OAuth Client ID and Client Secret
-- Hit Add — complete the GitHub OAuth consent screen when it appears
+```
+/aidos-builder   — scaffold and iterate on delivery artifacts
+/aidos-auditor   — audit an artifact against the rubrics
+```
 
-**Step 3 — Restrict tools to the minimal set**
+The skill loads automatically. If the GitHub MCP Connector is configured, the skill uses its tools to manage the repo. If Claude has direct filesystem access (Claude Code), the skill reads and writes files directly. You don't pick — the skill detects the environment.
 
-When prompted to configure tool permissions, enable only:
+## Project-level hints
 
-Read:
-- Get file or directory contents
-- List branches
-- List commits
-- List pull requests
-- Get details for a single pull request
-- Search code
-- Search repositories
+When using AIDOS in Claude Code, drop a short instruction in the project's own `CLAUDE.md` so Claude automatically invokes the right skill for AIDOS work:
 
-Write:
-- Create branch
-- Create or update file
-- Open new pull request
-- Push files to repository
-- Delete file
+```markdown
+For any Problem, Solution, Tech Design, or Testing artifact work, use the
+/aidos-builder skill. For reviewing artifacts, use /aidos-auditor in a
+separate session.
+```
 
-Block everything else.
-
-## Invoking the Skills
-
-Enable the GitHub MCP connector for your session via the tools menu,
-then invoke the skill:
-
-   /aidos-builder   — scaffold and iterate on delivery artifacts
-   /aidos-auditor   — audit an artifact against the rubrics
-
-The skill loads automatically and will check for existing aidos/ branches
-on your repo at the start of each session.
+The `.aidos/manifest.json` in your project configures both the GitHub MCP Connector's `write` strategy and the Confluence publish target (if used). See each connector's README for the manifest fields.

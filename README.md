@@ -69,53 +69,53 @@ The Problem artifact gets audited: is the stakeholder impact clear? Are the goal
 
 ---
 
-## Get Started
+## Components
 
-AIDOS ships as two AI skills — **Builder** and **Auditor** — packaged for Claude.
+AIDOS is four independent pieces. Pick the ones you need — each has its own README with the same structure: Prerequisites → Install → Use → Develop.
 
-| Skill | What It Does |
-|---|---|
-| **AIDOS Builder** | Runs a builder session. Scaffolds the right document structure for your scale, builds artifacts iteratively, captures decisions and issues inline. |
-| **AIDOS Auditor** | Runs an audit session. Assesses artifacts against Core and discipline rubrics, checks coherence with preceding artifacts, classifies findings as Bug / Risk / Idea. |
+| Component | What it is | README |
+|---|---|---|
+| **Framework** | The operating model, rubrics, templates, and prompts. Pure markdown, no build. Usable as-is with any AI that accepts a system prompt. | [`src/README.md`](src/README.md) |
+| **Skills** | The framework packaged as Claude Skills (Builder, Auditor). Built from the framework, published as ZIPs, installable in Claude.ai and Claude Code. | [`skills/README.md`](skills/README.md) |
+| **GitHub MCP Connector** | A local MCP server for Claude Desktop. Lets non-coders read, edit, and submit `.aidos/` artifacts in GitHub repos without touching Git. | [`src/connectors/github/README.md`](src/connectors/github/README.md) |
+| **Confluence Publish Connector** | A reusable GitHub Actions workflow that publishes `.aidos/` folders to Confluence on every push. Markdown-to-Confluence translation, content hashing, idempotent. | [`src/connectors/confluence/README.md`](src/connectors/confluence/README.md) |
 
-### Download
+Each component is optional and independent. Use one, two, three, or all four.
 
-Download the latest skill ZIPs from [shobman.github.io/aidos/skills/](https://shobman.github.io/aidos/skills/):
+---
 
-- [`aidos-builder.zip`](https://shobman.github.io/aidos/skills/aidos-builder.zip)
-- [`aidos-auditor.zip`](https://shobman.github.io/aidos/skills/aidos-auditor.zip)
+## Quick Start
 
-### Install on Claude.ai
+Pick the path that matches how you want to try AIDOS.
 
-1. Go to **Settings → Customize → Skills**
-2. Click **Upload** and select the ZIP file
-3. The skill appears in your skill list — Claude will use it when relevant
+**I just want to try it in an AI chat, no install**
+Copy [`src/prompts/builder-prompt.md`](src/prompts/builder-prompt.md) into a Claude / ChatGPT / Gemini session and describe what you're delivering. That's it. Audit a different session with [`src/prompts/auditor-prompt.md`](src/prompts/auditor-prompt.md).
 
-### Install in Claude Code
+**I use Claude and want a proper skill**
+Download [`aidos-builder.zip`](https://shobman.github.io/aidos/skills/aidos-builder.zip) and [`aidos-auditor.zip`](https://shobman.github.io/aidos/skills/aidos-auditor.zip), upload to Claude.ai (Settings → Customize → Skills) or extract into `.claude/skills/` in a Claude Code project. Invoke with `/aidos-builder` and `/aidos-auditor`. See [`skills/README.md`](skills/README.md).
 
-Copy the skill folder into your project:
+**I'm a non-coder and want Claude to author artifacts directly in a GitHub repo**
+Set up the GitHub MCP Connector in Claude Desktop: [`src/connectors/github/README.md`](src/connectors/github/README.md). Then install the Skills above. Claude will open a repo, create your personal `aidos/{username}` branch, and submit PRs per your project's write policy.
 
-```
-.claude/skills/aidos-builder/    ← contents of the builder ZIP
-.claude/skills/aidos-auditor/    ← contents of the auditor ZIP
-```
+**I want my artifacts to auto-publish to Confluence**
+Add the Confluence publish workflow to your repo: [`src/connectors/confluence/README.md`](src/connectors/confluence/README.md). Every push to your `.aidos/` folder publishes to Confluence. Works on its own, or stacks with the GitHub MCP Connector to close the loop: PO authors via Claude → merge → artifacts appear in Confluence.
 
-### Manual use (no skill install)
+---
 
-1. Read [`src/framework.md`](src/framework.md) — the mechanics, rubrics, and operating model.
-2. Pick your scale: **Epic** (big initiative), **Feature** (one deliverable), or **Story** (a day's work).
-3. Open any AI chat. Load the [builder prompt](src/prompts/builder-prompt.md) — it's self-contained.
-4. Build through the stack in order — Problem, then Solution, then Tech Design, then Testing — using the document structure for your scale. At Feature and Story scale, multiple artifacts combine into one document.
-5. Have someone who didn't build it [audit](src/prompts/auditor-prompt.md) against the rubrics and the preceding artifact.
-6. After the work ships, write the [Definition](src/templates/definition.md) — the living description that persists. Archive the delivery artifacts.
+## How it fits together
 
-No tooling to install. No platform to adopt. Markdown files, an AI, and discipline.
+The four components compose into a single authoring loop for non-technical contributors:
 
-### Using with Claude
+1. PO or BA opens Claude Desktop → invokes `/aidos-builder` (Skills)
+2. Skill detects the GitHub MCP Connector and resolves a repo → creates `aidos/{username}` branch
+3. User builds artifacts with the AI (Framework provides the methodology, templates, rubrics)
+4. User says "submit" → Skill opens a PR per the manifest's `write` strategy
+5. PR merges → Confluence Publish Connector runs via GitHub Actions → artifacts appear in Confluence
+6. Engineers see the same artifacts in their IDE via the repo
 
-AIDOS is agent-agnostic. The builder and auditor prompts work with any AI that accepts a system prompt. The framework is designed so that the quality mechanism scales from human-directed to fully autonomous delivery — see [Agent Autonomy Spectrum](docs/maturity-model.md).
+Each step is optional. You can use the Framework without Skills. Skills without Connectors. GitHub MCP without Confluence. Or any other combination.
 
-For Claude-specific setup — how to connect GitHub, invoke skills, and configure the MCP connector — see [CLAUDE.md](CLAUDE.md).
+For Claude-specific tips and the relationship between pieces, see [CLAUDE.md](CLAUDE.md).
 
 ---
 

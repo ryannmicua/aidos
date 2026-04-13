@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AIDOS Manifest",
+  "description": "Configuration for AIDOS artifact publishing and write strategy",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "write": {
+      "type": "object",
+      "description": "Write strategy for the GitHub MCP connector",
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["pr", "push"],
+          "default": "pr",
+          "description": "How changes integrate: 'pr' opens a pull request, 'push' merges directly"
+        },
+        "target": {
+          "type": "string",
+          "description": "Branch to create from and merge/PR into (default: repo default branch)"
+        },
+        "reviewers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "GitHub usernames or @team-names to request PR review from"
+        }
+      },
+      "additionalProperties": false
+    },
+    "publish": {
+      "type": "object",
+      "description": "Publish targets (Confluence, etc.)",
+      "additionalProperties": true
+    }
+  }
+}
