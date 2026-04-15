@@ -203,9 +203,9 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
     if (entry.type === "tree" && /(^|\/)\.aidos$/.test(entry.path)) {
       aidosFolderSet.add(entry.path);
     }
-    const match = entry.path.match(/^(.*\.aidos)\//);
-    if (match) {
-      aidosFolderSet.add(match[1]);
+    const segMatch = entry.path.match(/^(.*?(?:^|\/)\.aidos)\//);
+    if (segMatch) {
+      aidosFolderSet.add(segMatch[1]);
     }
   }
 

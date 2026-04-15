@@ -175,6 +175,24 @@ describe("resolveWorkspace", () => {
     const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
     assert.equal(result.publish_status, null);
   });
+
+  it("does not match paths where .aidos is a segment suffix (not its own segment)", async () => {
+    const client = mockClient({
+      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos/simon" }),
+      getTree: async () => ({
+        sha: "root",
+        tree: [
+          { path: "not.aidos/file.md", type: "blob", sha: "aaa" },
+          { path: "my.aidos/data.json", type: "blob", sha: "bbb" },
+          { path: ".aidos/real.md", type: "blob", sha: "ccc" },
+        ],
+      }),
+    });
+
+    const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
+    const paths = result.aidos_folders.map((f) => f.path);
+    assert.deepEqual(paths, [".aidos"], "only the real .aidos/ folder should be discovered");
+  });
 });
 
 describe("readArtifacts", () => {
