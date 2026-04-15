@@ -175,6 +175,9 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
   // Find all .aidos/ folder paths by scanning tree entries
   const aidosFolderSet = new Set();
   for (const entry of tree.tree) {
+    if (entry.type === "tree" && /(^|\/)\.aidos$/.test(entry.path)) {
+      aidosFolderSet.add(entry.path);
+    }
     const match = entry.path.match(/^(.*\.aidos)\//);
     if (match) {
       aidosFolderSet.add(match[1]);
@@ -440,6 +443,11 @@ server.registerTool(
       const repoFullName = resolved.repo;
       const workspace = await resolveWorkspace(auth.client, auth.login, repoFullName, branch || null);
       session.workspace = workspace;
+      if (workspace.aidos_folders.length === 1) {
+        session.workspace.selected_path = workspace.aidos_folders[0].path;
+      } else {
+        session.workspace.selected_path = null;
+      }
 
       return textResult(renderWorkspaceStatus(workspace));
     } catch (err) {

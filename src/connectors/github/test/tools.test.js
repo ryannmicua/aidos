@@ -102,6 +102,24 @@ describe("resolveWorkspace", () => {
     assert.ok(paths.includes(".aidos"), "root .aidos/ should be found");
     assert.ok(paths.includes("services/auth/.aidos"), "nested .aidos/ should be found");
   });
+
+  it("surfaces .aidos/ folders without a manifest as tree entries", async () => {
+    const client = mockClient({
+      getBranch: async (owner, repo, branch) => ({ commit: { sha: "abc123" }, name: branch }),
+      getTree: async () => ({
+        sha: "root",
+        tree: [
+          { path: ".aidos", type: "tree", sha: "tree1" },
+          { path: "src/index.js", type: "blob", sha: "eee" },
+        ],
+      }),
+    });
+
+    const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
+    const folder = result.aidos_folders.find((f) => f.path === ".aidos");
+    assert.ok(folder, ".aidos/ should be discovered even without manifest");
+    assert.equal(folder.manifest_present, false);
+  });
 });
 
 describe("readArtifacts", () => {
