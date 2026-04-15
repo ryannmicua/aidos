@@ -556,7 +556,7 @@ server.registerTool(
   {
     title: "Save AIDOS Artifacts",
     description:
-      "Write files to a branch as a single atomic commit using the Git Trees API. All files are committed together with an [aidos] prefix on the message.",
+      "Preview or commit files to a branch. Default returns a preview; call again with confirm=true to actually commit as a single atomic commit (prefixed [aidos]).",
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
       branch: z.string().describe("Branch to commit to"),
@@ -564,13 +564,29 @@ server.registerTool(
         .array(z.object({ path: z.string(), content: z.string() }))
         .describe("Files to write, each with path and content"),
       message: z.string().describe("Commit message (will be prefixed with [aidos])"),
+      confirm: z.boolean().default(false).describe("Set true to commit; false returns a preview"),
     }),
   },
-  async ({ repo, branch, files, message }) => {
+  async ({ repo, branch, files, message, confirm }) => {
     const auth = await requireAuth();
     if (!auth.authenticated) return textResult(auth.message);
+    const [owner, repoName] = repo.split("/");
     try {
-      const [owner, repoName] = repo.split("/");
+      if (!confirm) {
+        if (!files || files.length === 0) {
+          return textResult("Nothing to save (empty file list).");
+        }
+        const lines = [`Ready to commit to ${branch}:`, ""];
+        for (const f of files) {
+          const lineCount = f.content.split("\n").length;
+          lines.push(`  • ${f.path} (${lineCount} lines)`);
+        }
+        lines.push("");
+        lines.push(`Commit message: "${message}"`);
+        lines.push("");
+        lines.push("Call save again with confirm=true to commit.");
+        return textResult(lines.join("\n"));
+      }
       const result = await saveArtifacts(auth.client, owner, repoName, branch, files, message);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
