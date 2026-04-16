@@ -196,7 +196,14 @@ export async function buildConflictPacket(client, owner, repo, detection) {
     status: "conflict",
     conflicts,
     instructions:
-      "For each conflict, propose a resolution to the user. Call resolve() " +
-      "with the user's choice for each file, passing back the original block verbatim.",
+      "A publish conflict was detected — main has diverged from the working " +
+      "branch. For each conflicting file, show the user the three versions: " +
+      "base (the common ancestor), theirs (current content on main), and yours " +
+      "(current content on the working branch). Propose a reconciled version " +
+      "that preserves the intent of both sides — do not simply pick one side " +
+      "unless the user explicitly asks. When the user approves your proposed " +
+      "resolutions, call resolve() with a merges array. Each merge entry MUST " +
+      "include the original block (base/theirs/yours) echoed verbatim from " +
+      "this packet — it is the staleness check that catches concurrent pushes.",
   };
 }

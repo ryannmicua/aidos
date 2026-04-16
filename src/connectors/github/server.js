@@ -705,7 +705,7 @@ server.registerTool(
   {
     title: "Publish AIDOS Changes",
     description:
-      "Preflight and publish working branch changes via pull request (pr) or direct merge (push). Set confirm=true to execute after reviewing the preflight.",
+      "Preflight and publish working branch changes via pull request (pr) or direct merge (push). If main has diverged and the merge would conflict, returns a structured conflict packet with base/theirs/yours content per file — follow up with the resolve tool after walking the user through the conflicts. Set confirm=true to execute after reviewing the preflight.",
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
       branch: z.string().describe("Working branch to publish"),
@@ -759,7 +759,7 @@ server.registerTool(
   {
     title: "Resolve AIDOS Publish Conflicts",
     description:
-      "Apply conflict resolutions returned by publish(). Takes an array of merge packets, each with the original base/theirs/yours echoed back verbatim and the user's resolved content. Validates staleness, rejects if new conflicts appeared, otherwise commits the merge and opens the PR.",
+      "Apply conflict resolutions returned by publish(). Takes an array of merge packets, each with the original base/theirs/yours echoed back verbatim from publish's response and the user's resolved content. Validates staleness (rejects if main's content for a conflicting file changed since the packet was issued), checks for newly-conflicting paths not in the incoming merges, and on success commits a two-parent merge commit and opens the PR. If main drifted or a new conflict appeared, returns a fresh conflict packet — present the new state to the user and call resolve again with updated resolutions.",
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
       branch: z.string().describe("Working branch"),

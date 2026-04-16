@@ -127,6 +127,38 @@ resolve(merges)           → echoes the packet back with user's resolutions,
                             commits the merge, opens the PR
 ```
 
+### Example session
+
+A typical non-coder session looks like this. Your AI assistant handles the tool calls; you only write what's in bold.
+
+> **You:** Open the AIDOS workspace for portfolio-analytics.
+>
+> *Claude:* Found your workspace at `fefundinfo-zenith/Zenith.Core` on branch `aidos/you`. One artifact folder: `docs/projects/portfolio-analytics/.aidos/`. Manifest is configured to open PRs against `main` with reviewers `@product-team`. What do you want to work on?
+>
+> **You:** Update F1 with the new validation approach we agreed last week.
+>
+> *Claude:* [reads the artifacts]. Here's F1 currently — [summarises]. Based on our conversation, I'd change the validation section to say … Does that look right?
+>
+> **You:** Yes, that's good.
+>
+> *Claude:* Ready to commit `f1.md` with the updated validation section. Message: *"F1: update validation approach"*. OK to save?
+>
+> **You:** Go ahead.
+>
+> *Claude:* Saved. Anything else, or ready to publish?
+>
+> **You:** Publish.
+>
+> *Claude:* Pre-flight clean: branch is up to date with `main`, reviewers resolved. Call publish with confirm=true to proceed?
+>
+> **You:** Yes.
+>
+> *Claude:* Opened PR #42 — [link]. Merging will also trigger the Confluence publish workflow per your manifest. Done.
+
+That's the happy path. Two-phase prompts (`save` and `publish` both preview before acting) give you a chance to check what's about to happen before anything lands in the repo.
+
+When `main` has diverged and your changes clash with someone else's, `publish` returns a conflict packet instead — see the next section.
+
 ### Handling conflicts
 
 When `main` has advanced since you last synced and your changes overlap with someone else's, `publish` can't auto-merge. Instead it returns a **conflict packet** — for each conflicting file, you'll see the common ancestor content, what's on main now, and what's on your branch.
