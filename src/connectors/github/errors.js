@@ -30,7 +30,7 @@ export function userFacingError(status, context, details = {}) {
 
   if (status === 409) {
     const target = details.target || "the target branch";
-    return `Your changes conflict with what's on ${target}. A developer needs to merge ${target} into your branch before this can be submitted.`;
+    return `Your changes conflict with what's on ${target}. Call publish and follow the conflict-packet flow with resolve to reconcile.`;
   }
 
   if (status === 422) {
@@ -38,7 +38,7 @@ export function userFacingError(status, context, details = {}) {
       return `Couldn't assign reviewer '${details.name || "unknown"}'. Check the username or team name in the manifest.`;
     }
     if (context === "pr_create") {
-      return "Couldn't create the PR. Common causes: a PR already exists from this branch, or there are no changes to submit.";
+      return "Couldn't create the PR. Common causes: a PR already exists from this branch, or there are no changes to publish.";
     }
     return "Request was rejected by GitHub. Double-check the inputs.";
   }

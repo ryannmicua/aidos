@@ -7,8 +7,9 @@ import { createClient } from "./github.js";
 import { ensureAuth } from "./auth.js";
 import { mapGitHubError } from "./errors.js";
 import { validateManifest } from "./manifest.js";
+import { detectConflicts, buildConflictPacket, resolveConflicts } from "./merge.js";
 
-const server = new McpServer({ name: "aidos-github", version: "1.0.0" });
+const server = new McpServer({ name: "aidos-github", version: "1.0.1" });
 
 const session = {
   client: null,
@@ -63,7 +64,7 @@ export function renderManifestStatus(folder) {
   }
   const w = folder.write || {};
   if (w.strategy) lines.push(`  ✓ write.strategy: ${w.strategy} (PRs will target ${w.target})`);
-  else lines.push("  ⚠ No write config — Submit will default to PR against main.");
+  else lines.push("  ⚠ No write config — Publish will default to PR against main.");
   if (w.reviewers && w.reviewers.length) lines.push(`  ✓ write.reviewers: ${w.reviewers.join(", ")}`);
   if (folder.publish_configured) {
     lines.push("  ✓ publish.confluence configured");
@@ -89,6 +90,12 @@ export function renderWorkspaceStatus(workspace) {
     }
     lines.push("");
     lines.push("Continue where you left off, or say 'start fresh' to reset the branch.");
+  }
+
+  if (workspace.sync_conflict) {
+    lines.push("");
+    lines.push(`⚠ ${workspace.sync_conflict.conflicts.length} file(s) conflict between your branch and ${workspace.default_branch}.`);
+    lines.push("  Call publish to get the full conflict packet, then resolve to apply your choices.");
   }
 
   if (workspace.aidos_folders.length === 0) {
@@ -146,19 +153,28 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
 
   const branchName = branchOverride || `aidos/${login}`;
   let branchCreated = false;
+  let syncConflict = null;
 
   // Check if user branch exists
   let userBranchSha;
   try {
     const existing = await client.getBranch(owner, repo, branchName);
     userBranchSha = existing.commit.sha;
-    // Branch exists — sync by merging default branch into user branch
+    // Branch exists — sync by merging default branch into user branch.
     try {
       await client.merge(owner, repo, branchName, defaultBranch, `Sync ${defaultBranch} into ${branchName}`);
     } catch (err) {
-      // 409 = conflict — already up to date is acceptable too (merge returns null on 204, no throw)
-      if (!err.message.includes("409")) {
-        // Not a known benign error — still continue, sync is best-effort
+      const { status } = mapGitHubError(err, "merge");
+      if (status === 409) {
+        try {
+          const detection = await detectConflicts(client, owner, repo, branchName, defaultBranch);
+          if (detection.conflicts.length > 0) {
+            syncConflict = await buildConflictPacket(client, owner, repo, detection);
+          }
+        } catch (inner) {
+          console.error(`sync conflict probe failed: ${inner.message}`);
+        }
+      } else {
         console.error(`Merge warning: ${err.message}`);
       }
     }
@@ -273,6 +289,7 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
     aidos_folders: aidosFolders,
     work_in_progress: workInProgress,
     publish_status: publishStatus,
+    sync_conflict: syncConflict,
   };
 }
 
@@ -381,12 +398,12 @@ export async function diffBranch(client, owner, repo, branch, target) {
 }
 
 /**
- * Submit changes via PR or direct push/merge.
+ * Publish changes via PR or direct push/merge.
  *
  * @param {object} client - GitHub API client
  * @param {string} owner - Repository owner
  * @param {string} repo - Repository name
- * @param {string} branch - Working branch to submit
+ * @param {string} branch - Working branch to publish
  * @param {object} opts
  * @param {string} opts.strategy - "pr" or "push"
  * @param {string} opts.target - Target branch (e.g. "main")
@@ -395,7 +412,7 @@ export async function diffBranch(client, owner, repo, branch, target) {
  * @param {string} [opts.body] - PR body
  * @returns {{ type: "pr", number: number, url: string }|{ type: "push", merge_sha: string, branch_deleted: boolean }}
  */
-export async function submitChanges(client, owner, repo, branch, opts) {
+export async function publishChanges(client, owner, repo, branch, opts) {
   const { strategy, target, reviewers = [], title, body } = opts;
 
   if (strategy === "pr") {
@@ -422,9 +439,31 @@ export async function submitChanges(client, owner, repo, branch, opts) {
   return { type: "push", merge_sha: mergeResult.sha, branch_deleted: true };
 }
 
+/**
+ * Resolve conflicts and complete the publish in one call.
+ *
+ * Wraps resolveConflicts (which handles staleness and new-conflict detection)
+ * and, on successful merge commit, invokes publishChanges to open the PR or
+ * push-merge per the manifest write config.
+ */
+export async function resolveConflictsAndPublish(client, owner, repo, branch, opts) {
+  const { target, strategy, reviewers, title, body, merges } = opts;
+
+  const resolveResult = await resolveConflicts(client, owner, repo, branch, target, merges);
+  if (resolveResult.status === "conflict") {
+    return resolveResult;
+  }
+
+  const publishResult = await publishChanges(client, owner, repo, branch, {
+    strategy, target, reviewers, title, body,
+  });
+
+  return { status: "resolved", commit: resolveResult.commit, ...publishResult };
+}
+
 // ---- Pre-flight ----
 
-export async function preflightSubmit(client, owner, repo, branch, opts) {
+export async function preflightPublish(client, owner, repo, branch, opts) {
   const { target, reviewers = [] } = opts;
   const checks = [];
 
@@ -439,10 +478,20 @@ export async function preflightSubmit(client, owner, repo, branch, opts) {
     const cmp = await client.compare(owner, repo, target, branch);
     const behind = cmp.behind_by || 0;
     if (behind > 0) {
+      const detection = await detectConflicts(client, owner, repo, branch, target);
+      if (detection.conflicts.length > 0) {
+        const packet = await buildConflictPacket(client, owner, repo, detection);
+        checks.push({
+          name: "conflicts",
+          pass: false,
+          message: `Branch is ${behind} commit(s) behind ${target} with ${detection.conflicts.length} conflicting file(s).`,
+        });
+        return { ok: false, checks, conflict_packet: packet };
+      }
       checks.push({
         name: "conflicts",
-        pass: false,
-        message: `Branch is ${behind} commit(s) behind ${target} — possible conflict. A developer may need to merge ${target} into ${branch}.`,
+        pass: true,
+        message: `Branch is behind by ${behind} but no conflicts — merge will be clean at confirm time.`,
       });
     } else {
       checks.push({ name: "conflicts", pass: true, message: `No conflicts with ${target}` });
@@ -652,16 +701,16 @@ server.registerTool(
 );
 
 server.registerTool(
-  "submit",
+  "publish",
   {
-    title: "Submit AIDOS Changes",
+    title: "Publish AIDOS Changes",
     description:
-      "Preflight and submit working branch changes via pull request (pr) or direct merge (push). Set confirm=true to execute after reviewing the preflight.",
+      "Preflight and publish working branch changes via pull request (pr) or direct merge (push). If main has diverged and the merge would conflict, returns a structured conflict packet with base/theirs/yours content per file — follow up with the resolve tool after walking the user through the conflicts. Set confirm=true to execute after reviewing the preflight.",
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
-      branch: z.string().describe("Working branch to submit"),
+      branch: z.string().describe("Working branch to publish"),
       target: z.string().describe("Target branch (e.g. main)"),
-      strategy: z.enum(["pr", "push"]).describe("Submission strategy: pr or push"),
+      strategy: z.enum(["pr", "push"]).describe("Publication strategy: pr or push"),
       reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs)"),
       title: z.string().optional().describe("PR title (pr strategy only)"),
       body: z.string().optional().describe("PR body (pr strategy only)"),
@@ -674,22 +723,25 @@ server.registerTool(
     const [owner, repoName] = repo.split("/");
 
     try {
-      const pre = await preflightSubmit(auth.client, owner, repoName, branch, { strategy, target, reviewers });
+      const pre = await preflightPublish(auth.client, owner, repoName, branch, { strategy, target, reviewers });
       if (!pre.ok) {
+        if (pre.conflict_packet) {
+          return { content: [{ type: "text", text: JSON.stringify(pre.conflict_packet, null, 2) }] };
+        }
         return textResult(
           "Pre-flight found issues:\n\n" +
           pre.checks.map((c) => `${c.pass ? "✓" : "✗"} ${c.message}`).join("\n") +
-          "\n\nFix these before submitting."
+          "\n\nFix these before publishing."
         );
       }
       if (!confirm) {
         return textResult(
-          "Pre-flight check for submit:\n\n" +
+          "Pre-flight check for publish:\n\n" +
           pre.checks.map((c) => `✓ ${c.message}`).join("\n") +
-          "\n\nCall submit again with confirm=true to proceed."
+          "\n\nCall publish again with confirm=true to proceed."
         );
       }
-      const result = await submitChanges(auth.client, owner, repoName, branch, {
+      const result = await publishChanges(auth.client, owner, repoName, branch, {
         strategy, target, reviewers, title, body,
       });
       if (result.type === "pr") {
@@ -697,7 +749,49 @@ server.registerTool(
       }
       return textResult(`Merged branch ${branch} into ${target} (commit ${result.merge_sha}). Branch deleted.`);
     } catch (err) {
-      return textResult(translateToolError(err, { op: "submit", target }));
+      return textResult(translateToolError(err, { op: "publish", target }));
+    }
+  },
+);
+
+server.registerTool(
+  "resolve",
+  {
+    title: "Resolve AIDOS Publish Conflicts",
+    description:
+      "Apply conflict resolutions returned by publish(). Takes an array of merge packets, each with the original base/theirs/yours echoed back verbatim from publish's response and the user's resolved content. Validates staleness (rejects if main's content for a conflicting file changed since the packet was issued), checks for newly-conflicting paths not in the incoming merges, and on success commits a two-parent merge commit and opens the PR. If main drifted or a new conflict appeared, returns a fresh conflict packet — present the new state to the user and call resolve again with updated resolutions.",
+    inputSchema: z.object({
+      repo: z.string().describe("Repository as owner/repo"),
+      branch: z.string().describe("Working branch"),
+      target: z.string().describe("Target branch (e.g. main)"),
+      strategy: z.enum(["pr", "push"]).describe("pr or push"),
+      reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs)"),
+      title: z.string().optional(),
+      body: z.string().optional(),
+      merges: z.array(
+        z.object({
+          path: z.string(),
+          original: z.object({
+            base: z.string(),
+            theirs: z.string(),
+            yours: z.string(),
+          }),
+          resolved: z.string(),
+        }),
+      ).describe("Per-file resolutions; original block must be echoed verbatim from publish()'s response"),
+    }),
+  },
+  async ({ repo, branch, target, strategy, reviewers, title, body, merges }) => {
+    const auth = await requireAuth();
+    if (!auth.authenticated) return textResult(auth.message);
+    const [owner, repoName] = repo.split("/");
+    try {
+      const result = await resolveConflictsAndPublish(auth.client, owner, repoName, branch, {
+        target, strategy, reviewers, title, body, merges,
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return textResult(translateToolError(err, { op: "resolve", target }));
     }
   },
 );

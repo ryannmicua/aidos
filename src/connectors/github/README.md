@@ -2,7 +2,7 @@
 
 A local MCP server that gives AI agents (Claude Desktop, Copilot) read/write access to `.aidos/` folders in GitHub repos.
 
-Lets non-technical users author AIDOS artifacts via AI without ever touching Git. The server runs as a subprocess of your MCP client and exposes 5 tools that the AI uses to resolve repos, read artifacts, save changes, review diffs, and submit PRs.
+Lets non-technical users author AIDOS artifacts via AI without ever touching Git. The server runs as a subprocess of your MCP client and exposes 6 tools that the AI uses to resolve repos, read artifacts, save changes, review diffs, publish PRs, and resolve merge conflicts.
 
 ---
 
@@ -87,7 +87,7 @@ If the file already has other MCP servers, add `aidos-github` alongside them ins
 
 1. Quit Claude Desktop completely and reopen it
 2. Start a new chat
-3. The 5 AIDOS tools should be available: `open_workspace`, `read_artifacts`, `save`, `diff`, `submit`
+3. The 6 AIDOS tools should be available: `open_workspace`, `read_artifacts`, `save`, `diff`, `publish`, `resolve`
 4. Ask Claude: *"Open the AIDOS workspace for `<your-org>/<your-repo>`"*
 5. The first call triggers GitHub device flow:
    - Claude shows: *"Go to https://github.com/login/device and enter code XXXX-XXXX"*
@@ -106,9 +106,10 @@ The auth flow is two-phase: the first call initiates device flow and returns the
 | `read_artifacts` | Batch read all files from a `.aidos/` folder |
 | `save` | Preview files to commit (default) or commit them (`confirm=true`) |
 | `diff` | Show changes vs target branch |
-| `submit` | Run pre-flight checks (branch exists, conflicts, reviewers) and preview; execute on `confirm=true` |
+| `publish` | Run pre-flight checks (branch exists, conflicts, reviewers) and preview; execute on `confirm=true` |
+| `resolve` | Apply conflict resolutions returned by `publish` — commits the merge and opens the PR in one call |
 
-`save` and `submit` are two-phase: the first call returns a preview, the second call with `confirm=true` performs the action. This gives the AI a chance to show you the plan before changes hit the repo.
+`save` and `publish` are two-phase: the first call returns a preview, the second call with `confirm=true` performs the action. This gives the AI a chance to show you the plan before changes hit the repo.
 
 ### Workflow
 
@@ -120,9 +121,54 @@ read_artifacts(...)       → loads all artifacts into AI context
 save(files, message)      → returns preview of files and commit message
 save(..., confirm=true)   → atomic commit to working branch
 diff()                    → review changes vs target branch
-submit()                  → runs pre-flight, returns check report
-submit(..., confirm=true) → create PR or merge per manifest.json write config
+publish()                 → runs pre-flight, opens PR on clean sync,
+                            returns conflict packet if main diverged
+resolve(merges)           → echoes the packet back with user's resolutions,
+                            commits the merge, opens the PR
 ```
+
+### Example session
+
+A typical non-coder session looks like this. Your AI assistant handles the tool calls; you only write what's in bold.
+
+> **You:** Open the AIDOS workspace for portfolio-analytics.
+>
+> *Claude:* Found your workspace at `fefundinfo-zenith/Zenith.Core` on branch `aidos/you`. One artifact folder: `docs/projects/portfolio-analytics/.aidos/`. Manifest is configured to open PRs against `main` with reviewers `@product-team`. What do you want to work on?
+>
+> **You:** Update F1 with the new validation approach we agreed last week.
+>
+> *Claude:* [reads the artifacts]. Here's F1 currently — [summarises]. Based on our conversation, I'd change the validation section to say … Does that look right?
+>
+> **You:** Yes, that's good.
+>
+> *Claude:* Ready to commit `f1.md` with the updated validation section. Message: *"F1: update validation approach"*. OK to save?
+>
+> **You:** Go ahead.
+>
+> *Claude:* Saved. Anything else, or ready to publish?
+>
+> **You:** Publish.
+>
+> *Claude:* Pre-flight clean: branch is up to date with `main`, reviewers resolved. Call publish with confirm=true to proceed?
+>
+> **You:** Yes.
+>
+> *Claude:* Opened PR #42 — [link]. Merging will also trigger the Confluence publish workflow per your manifest. Done.
+
+That's the happy path. Two-phase prompts (`save` and `publish` both preview before acting) give you a chance to check what's about to happen before anything lands in the repo.
+
+When `main` has diverged and your changes clash with someone else's, `publish` returns a conflict packet instead — see the next section.
+
+### Handling conflicts
+
+When `main` has advanced since you last synced and your changes overlap with someone else's, `publish` can't auto-merge. Instead it returns a **conflict packet** — for each conflicting file, you'll see the common ancestor content, what's on main now, and what's on your branch.
+
+Your AI assistant will walk through each conflict with you and propose a merged version. When you're happy, the assistant calls `resolve` with your choices. The connector:
+1. Verifies the main content hasn't drifted since the packet was generated (if it has, you'll see a fresh conflict for that file).
+2. Commits a proper merge commit with both branches as parents.
+3. Opens the PR.
+
+If someone else pushed between your resolution and the `resolve` call, you'll just cycle through the flow one more time — the connector never silently drops anyone's changes.
 
 ### Manifest configuration
 
@@ -152,7 +198,7 @@ Each user gets one `aidos/{github-username}` branch per repo. The branch is crea
 
 ### Publish side-effect
 
-If the repo's `.aidos/manifest.json` has a `publish.*` section (e.g. `publish.confluence`), a merge of the working branch into the target branch will trigger a publish via GitHub Actions. The builder skill warns about this before submit — you'll know before any side-effects happen.
+If the repo's `.aidos/manifest.json` has a `publish.*` section (e.g. `publish.confluence`), a merge of the working branch into the target branch will trigger a publish via GitHub Actions. The builder skill warns about this before publish — you'll know before any side-effects happen.
 
 ## Develop
 
@@ -170,7 +216,7 @@ npm install
 npm test
 ```
 
-80 tests across 15 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
+113 tests across 24 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
 
 ### Project structure
 
@@ -182,6 +228,7 @@ src/connectors/github/
 ├── errors.js                   ← User-facing error mapper
 ├── manifest.js                 ← Manifest schema validation (ajv)
 ├── manifest.schema.json        ← JSON Schema for .aidos/manifest.json
+├── merge.js                    ← Conflict detection, packet building, Flavor B 3-way merge orchestration
 ├── package.json                ← Node package (ESM, @modelcontextprotocol/sdk, zod, ajv)
 ├── README.md                   ← This file
 └── test/
@@ -189,14 +236,16 @@ src/connectors/github/
     ├── auth-flow.test.js       ← Two-phase device flow tests
     ├── errors.test.js          ← Error mapper tests
     ├── github.test.js          ← API client unit tests
+    ├── integration.test.js     ← End-to-end publish→conflict→resolve loop tests
     ├── manifest.test.js        ← Manifest validation tests
-    ├── preflight.test.js       ← Submit pre-flight tests
+    ├── merge.test.js           ← Merge logic unit tests
+    ├── preflight.test.js       ← Publish pre-flight tests
     ├── rendering.test.js       ← Workspace dashboard rendering tests
     ├── resolve-repo.test.js    ← Fuzzy repo resolution tests
     └── tools.test.js           ← Tool logic tests with mocked client
 ```
 
-Each logic function is exported from `server.js` and unit-tested in isolation (see `resolveWorkspace`, `readArtifacts`, `saveArtifacts`, `diffBranch`, `submitChanges`). The MCP tool registrations wrap these functions thinly — test the logic, not the MCP protocol.
+Each logic function is exported from `server.js` and unit-tested in isolation (see `resolveWorkspace`, `readArtifacts`, `saveArtifacts`, `diffBranch`, `publishChanges`). The MCP tool registrations wrap these functions thinly — test the logic, not the MCP protocol.
 
 ### Run the server manually
 
@@ -237,8 +286,8 @@ You asked the AI to open the workspace again before completing the browser autho
 **Tools don't appear in Claude Desktop**
 Check the Claude Desktop logs (Settings → Developer → Open Logs Folder) for `aidos-github` errors. Common causes: wrong path to `server.js`, `npm install` not run, invalid JSON in `claude_desktop_config.json`.
 
-**"Your changes conflict with what's on main..."**
-Someone changed `.aidos/` files on the target branch while your `aidos/{you}` branch had unmerged work. A developer needs to resolve this manually with `git checkout aidos/{you} && git merge main`. This shows up in the `submit` pre-flight report before any changes are attempted.
+**"Publish returned a conflict packet"**
+Main has changes that overlap with yours. The AI will walk through each conflict and propose a resolution — confirm or adjust each one, and the `resolve` tool commits the merge and opens the PR. No terminal or manual `git merge` required.
 
 **Re-authenticate**
 Normally not needed — a revoked or expired token triggers a fresh device flow automatically on the next call. If you want to force it, delete `~/.aidos/auth.json` and `~/.aidos/pending_auth.json`.

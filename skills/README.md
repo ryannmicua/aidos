@@ -55,10 +55,10 @@ Once installed, invoke the skills in a Claude session:
 
 **Environment awareness.** The skills operate in two modes:
 
-- **With the GitHub MCP Connector configured** (Claude Desktop): the skills use MCP tools (`open_workspace`, `read_artifacts`, `save`, `diff`, `submit`) to manage a working branch in a GitHub repo. See [`../src/connectors/github/README.md`](../src/connectors/github/README.md).
+- **With the GitHub MCP Connector configured** (Claude Desktop): the skills use MCP tools (`open_workspace`, `read_artifacts`, `save`, `diff`, `publish`, `resolve`) to manage a working branch in a GitHub repo. See [`../src/connectors/github/README.md`](../src/connectors/github/README.md).
 - **With direct filesystem access** (Claude Code, or any environment with file read/write): the skills read and write `.aidos/` files directly.
 
-**Publish side-effects.** If the target repo has a `publish.*` section in its `.aidos/manifest.json` (e.g. `publish.confluence`), saving or merging to the target branch may trigger automatic publishing. The builder warns about this before you submit.
+**Publish side-effects.** If the target repo has a `publish.*` section in its `.aidos/manifest.json` (e.g. `publish.confluence`), saving or merging to the target branch may trigger automatic publishing. The builder warns about this before you publish.
 
 ## Skills structure
 

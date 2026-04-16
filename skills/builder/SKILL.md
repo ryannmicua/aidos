@@ -41,7 +41,7 @@ When the user describes work they want to deliver, you:
 
 This skill runs in multiple environments. Inspect what's available and use the right surface:
 
-- **AIDOS GitHub MCP Connector (Claude Desktop).** Tools like `open_workspace`, `read_artifacts`, `save`, `diff`, `submit` are available. Use them for all repo operations. The connector manages a per-user `aidos/{username}` working branch and handles PR creation per the manifest's write strategy.
+- **AIDOS GitHub MCP Connector (Claude Desktop).** Tools like `open_workspace`, `read_artifacts`, `save`, `diff`, `publish`, `resolve` are available. Use them for all repo operations. The connector manages a per-user `aidos/{username}` working branch and handles PR creation per the manifest's write strategy.
 - **Direct filesystem access (Claude Code).** Read and write `.aidos/` files directly. Honour any local Git conventions the user has.
 - **Plain chat (no repo access).** Work with files the user pastes in. Render artifacts inline for copy-out.
 
@@ -58,7 +58,7 @@ Don't name specific MCP tools in your responses — just use whatever's there. T
    inline in the chat. This is the primary review surface — the user should
    never need to open a browser to review work in progress.
    The user decides when to commit and when to push. Never auto-commit.
-   Never auto-submit. Wait for explicit instruction.
+   Never auto-publish. Wait for explicit instruction.
 
 3. **BRANCHING (when a repo is available)**
    Never commit directly to main or the default branch. In the MCP environment
@@ -66,17 +66,41 @@ Don't name specific MCP tools in your responses — just use whatever's there. T
    your per-user `aidos/{username}` branch. In the filesystem environment,
    check existing `aidos/*` branches and let the user decide which to use.
 
-4. **PULL REQUESTS / SUBMIT**
-   When the user asks to open a PR or submit, check the `.aidos/manifest.json`
+4. **PULL REQUESTS / PUBLISH**
+   When the user asks to open a PR or publish, check the `.aidos/manifest.json`
    for the write target. If no manifest or no target specified, ask the user
    where it should go. Do not assume main, master, or develop.
 
 5. **PUBLISH SIDE-EFFECTS**
-   Before the user submits, check the `.aidos/manifest.json` for a `publish.*`
+   Before the user publishes, check the `.aidos/manifest.json` for a `publish.*`
    section (e.g. `publish.confluence`). If present, tell the user what will
    happen: *"When this merges to `<target>`, the Confluence connector will
    publish these artifacts to `<baseUrl>/pages/<rootPageId>` automatically."*
-   Get their acknowledgement before submitting. Non-technical users should
+   Get their acknowledgement before publishing. Non-technical users should
    never be surprised by where their draft ends up.
+
+6. **PUBLISH CONFLICT RESOLUTION**
+   When `publish` returns a conflict packet (status: "conflict"), `main` has
+   diverged from the working branch on one or more files. The packet contains,
+   for each conflicting file, the common-ancestor content (`base`), the current
+   content on main (`theirs`), and the branch's content (`yours`).
+
+   Walk the user through each conflict:
+   - Present the three versions clearly (prefer a diff view over raw content).
+   - Propose a reconciled version that preserves the intent of both sides.
+   - Let the user accept, adjust, or pick `theirs`/`yours` verbatim.
+
+   When the user has decided every conflict, call `resolve` with a `merges`
+   array. Each entry MUST include the `original` block (base/theirs/yours)
+   echoed back verbatim from the packet — this is the connector's staleness
+   check. The `resolved` field is the user's chosen final content.
+
+   If `resolve` returns a fresh conflict packet (someone else pushed in the
+   meantime), restart the walk-through for the newly surfaced files. This can
+   happen multiple times on busy branches — it's normal, the connector never
+   silently drops anyone's changes.
+
+   On success, `resolve` opens the PR (or push-merge per manifest) in the same
+   call. No separate `publish` follow-up needed.
 
 Start by reading `builder-prompt.md`, then follow its Session Start instructions.

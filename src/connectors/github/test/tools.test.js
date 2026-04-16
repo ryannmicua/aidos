@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch, submitChanges } from "../server.js";
+import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch, publishChanges, resolveConflictsAndPublish } from "../server.js";
 
 function mockClient(overrides = {}) {
   const defaults = {
@@ -193,6 +193,37 @@ describe("resolveWorkspace", () => {
     const paths = result.aidos_folders.map((f) => f.path);
     assert.deepEqual(paths, [".aidos"], "only the real .aidos/ folder should be discovered");
   });
+
+  it("attaches a conflict packet when sync merge hits 409", async () => {
+    const client = mockClient({
+      getBranch: async (o, r, b) => ({ commit: { sha: b === "main" ? "m1" : "b1" }, name: b }),
+      merge: async () => { throw new Error("GitHub API 409: merge conflict"); },
+      compare: async () => ({
+        merge_base_commit: { sha: "base-sha" },
+        ahead_by: 1, behind_by: 2,
+      }),
+      getTree: async (o, r, sha) => {
+        if (sha === "base-sha") return { tree: [{ path: "x.md", type: "blob", sha: "x0" }]};
+        if (sha === "m1")       return { tree: [{ path: "x.md", type: "blob", sha: "xm" }]};
+        if (sha === "b1")       return { tree: [
+          { path: "x.md", type: "blob", sha: "xb" },
+          { path: ".aidos/manifest.json", type: "blob", sha: "bbb" },
+        ]};
+        return { tree: [] };
+      },
+      getBlob: async (o, r, sha) => {
+        const map = { "x0": "BASE", "xm": "MAIN", "xb": "BRANCH" };
+        if (map[sha]) return { content: Buffer.from(map[sha]).toString("base64"), encoding: "base64" };
+        return { content: Buffer.from(JSON.stringify({ write: { strategy: "pr", target: "main" } })).toString("base64"), encoding: "base64" };
+      },
+    });
+
+    const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
+
+    assert.ok(result.sync_conflict, "workspace must include sync_conflict when 409 hit");
+    assert.equal(result.sync_conflict.status, "conflict");
+    assert.equal(result.sync_conflict.conflicts[0].path, "x.md");
+  });
 });
 
 describe("readArtifacts", () => {
@@ -346,7 +377,7 @@ describe("diffBranch", () => {
   });
 });
 
-describe("submitChanges", () => {
+describe("publishChanges", () => {
   it("creates PR with reviewers when strategy is pr", async () => {
     let createPullArgs;
     let requestReviewersArgs;
@@ -362,7 +393,7 @@ describe("submitChanges", () => {
       },
     });
 
-    const result = await submitChanges(client, "org", "my-repo", "aidos/simon", {
+    const result = await publishChanges(client, "org", "my-repo", "aidos/simon", {
       strategy: "pr",
       target: "main",
       reviewers: ["alice", "bob"],
@@ -392,7 +423,7 @@ describe("submitChanges", () => {
       },
     });
 
-    const result = await submitChanges(client, "org", "my-repo", "aidos/simon", {
+    const result = await publishChanges(client, "org", "my-repo", "aidos/simon", {
       strategy: "push",
       target: "main",
       reviewers: [],
@@ -416,7 +447,7 @@ describe("submitChanges", () => {
       },
     });
 
-    await submitChanges(client, "org", "my-repo", "aidos/simon", {
+    await publishChanges(client, "org", "my-repo", "aidos/simon", {
       strategy: "pr",
       target: "main",
       reviewers: [],
@@ -424,5 +455,82 @@ describe("submitChanges", () => {
     });
 
     assert.equal(requestReviewersCalled, false, "requestReviewers should NOT be called when no reviewers");
+  });
+});
+
+describe("resolveConflictsAndPublish", () => {
+  it("opens a PR after a successful resolve", async () => {
+    let created = null;
+    const client = {
+      // detectConflicts path
+      compare: async () => ({ merge_base_commit: { sha: "base-sha" } }),
+      getBranch: async (o, r, b) => ({ commit: { sha: b === "main" ? "main-sha" : "branch-sha" } }),
+      getTree: async (o, r, sha) => {
+        if (sha === "base-sha")   return { tree: [{ path: "a.md", type: "blob", sha: "a-base" }]};
+        if (sha === "main-sha")   return { tree: [{ path: "a.md", type: "blob", sha: "a-main" }]};
+        if (sha === "branch-sha") return { tree: [{ path: "a.md", type: "blob", sha: "a-branch" }]};
+        return { tree: [] };
+      },
+      getBlob: async (o, r, sha) => {
+        const map = { "a-base": "BASE", "a-main": "MAIN", "a-branch": "BRANCH" };
+        return { content: Buffer.from(map[sha] || "").toString("base64"), encoding: "base64" };
+      },
+      createTree: async () => ({ sha: "new-tree" }),
+      createCommit: async () => ({ sha: "merge-commit" }),
+      updateRef: async () => ({}),
+      // publishChanges path
+      createPull: async (o, r, opts) => { created = opts; return { number: 42, html_url: "https://x/pr/42" }; },
+      requestReviewers: async () => ({}),
+    };
+
+    const result = await resolveConflictsAndPublish(client, "org", "repo", "aidos/simon", {
+      target: "main",
+      strategy: "pr",
+      reviewers: [],
+      title: "t",
+      body: "b",
+      merges: [{
+        path: "a.md",
+        original: { base: "BASE", theirs: "MAIN", yours: "BRANCH" },
+        resolved: "RESOLVED",
+      }],
+    });
+
+    assert.equal(result.status, "resolved");
+    assert.equal(result.type, "pr");
+    assert.equal(result.number, 42);
+    assert.equal(created.head, "aidos/simon");
+    assert.equal(created.base, "main");
+  });
+
+  it("returns the conflict packet without opening PR when resolve surfaces new conflicts", async () => {
+    let createPullCalled = false;
+    const client = {
+      compare: async () => ({ merge_base_commit: { sha: "base-sha" } }),
+      getBranch: async (o, r, b) => ({ commit: { sha: b === "main" ? "main-sha" : "branch-sha" } }),
+      getTree: async (o, r, sha) => {
+        if (sha === "base-sha")   return { tree: [{ path: "a.md", type: "blob", sha: "a-base" }]};
+        if (sha === "main-sha")   return { tree: [{ path: "a.md", type: "blob", sha: "a-main-NEW" }]};
+        if (sha === "branch-sha") return { tree: [{ path: "a.md", type: "blob", sha: "a-branch" }]};
+        return { tree: [] };
+      },
+      getBlob: async (o, r, sha) => {
+        const map = { "a-base": "BASE", "a-main-NEW": "NEW MAIN", "a-branch": "BRANCH" };
+        return { content: Buffer.from(map[sha] || "").toString("base64"), encoding: "base64" };
+      },
+      createPull: async () => { createPullCalled = true; return { number: 0, html_url: "x" }; },
+    };
+
+    const result = await resolveConflictsAndPublish(client, "org", "repo", "aidos/simon", {
+      target: "main", strategy: "pr", reviewers: [], title: "t", body: "b",
+      merges: [{
+        path: "a.md",
+        original: { base: "BASE", theirs: "OLD MAIN", yours: "BRANCH" },
+        resolved: "R",
+      }],
+    });
+
+    assert.equal(result.status, "conflict");
+    assert.equal(createPullCalled, false);
   });
 });

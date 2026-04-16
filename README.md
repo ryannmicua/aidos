@@ -77,7 +77,7 @@ AIDOS is four independent pieces. Pick the ones you need — each has its own RE
 |---|---|---|
 | **Framework** | The operating model, rubrics, templates, and prompts. Pure markdown, no build. Usable as-is with any AI that accepts a system prompt. | [`src/README.md`](src/README.md) |
 | **Skills** | The framework packaged as Claude Skills (Builder, Auditor). Built from the framework, published as ZIPs, installable in Claude.ai and Claude Code. | [`skills/README.md`](skills/README.md) |
-| **GitHub MCP Connector** | A local MCP server for Claude Desktop. Lets non-coders read, edit, and submit `.aidos/` artifacts in GitHub repos without touching Git. | [`src/connectors/github/README.md`](src/connectors/github/README.md) |
+| **GitHub MCP Connector** | A local MCP server for Claude Desktop. Lets non-coders read, edit, and publish `.aidos/` artifacts in GitHub repos without touching Git. | [`src/connectors/github/README.md`](src/connectors/github/README.md) |
 | **Confluence Publish Connector** | A reusable GitHub Actions workflow that publishes `.aidos/` folders to Confluence on every push. Markdown-to-Confluence translation, content hashing, idempotent. | [`src/connectors/confluence/README.md`](src/connectors/confluence/README.md) |
 
 Each component is optional and independent. Use one, two, three, or all four.
@@ -95,7 +95,7 @@ Copy [`src/prompts/builder-prompt.md`](src/prompts/builder-prompt.md) into a Cla
 Download [`aidos-builder.zip`](https://shobman.github.io/aidos/skills/aidos-builder.zip) and [`aidos-auditor.zip`](https://shobman.github.io/aidos/skills/aidos-auditor.zip), upload to Claude.ai (Settings → Customize → Skills) or extract into `.claude/skills/` in a Claude Code project. Invoke with `/aidos-builder` and `/aidos-auditor`. See [`skills/README.md`](skills/README.md).
 
 **I'm a non-coder and want Claude to author artifacts directly in a GitHub repo**
-Set up the GitHub MCP Connector in Claude Desktop: [`src/connectors/github/README.md`](src/connectors/github/README.md). Then install the Skills above. Claude will open a repo, create your personal `aidos/{username}` branch, and submit PRs per your project's write policy.
+Set up the GitHub MCP Connector in Claude Desktop: [`src/connectors/github/README.md`](src/connectors/github/README.md). Then install the Skills above. Claude will open a repo, create your personal `aidos/{username}` branch, and publish PRs per your project's write policy.
 
 **I want my artifacts to auto-publish to Confluence**
 Add the Confluence publish workflow to your repo: [`src/connectors/confluence/README.md`](src/connectors/confluence/README.md). Every push to your `.aidos/` folder publishes to Confluence. Works on its own, or stacks with the GitHub MCP Connector to close the loop: PO authors via Claude → merge → artifacts appear in Confluence.
@@ -109,7 +109,7 @@ The four components compose into a single authoring loop for non-technical contr
 1. PO or BA opens Claude Desktop → invokes `/aidos-builder` (Skills)
 2. Skill detects the GitHub MCP Connector and resolves a repo → creates `aidos/{username}` branch
 3. User builds artifacts with the AI (Framework provides the methodology, templates, rubrics)
-4. User says "submit" → Skill opens a PR per the manifest's `write` strategy
+4. User says "publish" → Skill opens a PR per the manifest's `write` strategy
 5. PR merges → Confluence Publish Connector runs via GitHub Actions → artifacts appear in Confluence
 6. Engineers see the same artifacts in their IDE via the repo
 
