@@ -2,7 +2,7 @@
 
 A local MCP server that gives AI agents (Claude Desktop, Copilot) read/write access to `.aidos/` folders in GitHub repos.
 
-Lets non-technical users author AIDOS artifacts via AI without ever touching Git. The server runs as a subprocess of your MCP client and exposes 6 tools that the AI uses to resolve repos, read artifacts, save changes, review diffs, publish PRs, and resolve merge conflicts.
+Lets non-technical users author AIDOS artifacts via AI without ever touching Git. The server runs as a subprocess of your MCP client and exposes 7 tools that the AI uses to resolve repos, read artifacts, save changes, surgically edit files, review diffs, publish PRs, and resolve merge conflicts.
 
 ---
 
@@ -220,7 +220,7 @@ npm install
 npm test
 ```
 
-113 tests across 24 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
+130 tests across 26 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
 
 ### Project structure
 
@@ -230,6 +230,7 @@ src/connectors/github/
 ├── github.js                   ← GitHub REST API client (fetch-based)
 ├── auth.js                     ← Two-phase device flow + token cache
 ├── errors.js                   ← User-facing error mapper
+├── edit.js                     ← Surgical string-replacement logic for the edit tool
 ├── manifest.js                 ← Manifest schema validation (ajv)
 ├── manifest.schema.json        ← JSON Schema for .aidos/manifest.json
 ├── merge.js                    ← Conflict detection, packet building, Flavor B 3-way merge orchestration
@@ -238,6 +239,7 @@ src/connectors/github/
 └── test/
     ├── auth.test.js            ← Token cache tests
     ├── auth-flow.test.js       ← Two-phase device flow tests
+    ├── edit.test.js            ← Edit logic unit tests
     ├── errors.test.js          ← Error mapper tests
     ├── github.test.js          ← API client unit tests
     ├── integration.test.js     ← End-to-end publish→conflict→resolve loop tests
