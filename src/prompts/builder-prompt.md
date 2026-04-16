@@ -29,7 +29,7 @@ Everything goes in the artifact. If it happened in the session — a decision, a
 
 Before anything else, detect where you're running and which capabilities are available:
 
-- **MCP tools available?** If tools like `open_workspace`, `read_artifacts`, `save`, `diff`, `publish`, `resolve` (or any repo-oriented MCP tools) are present, you're running via the AIDOS GitHub MCP Connector. Use those tools for all repo operations — don't try to shell out or use a filesystem.
+- **MCP tools available?** If tools like `open_workspace`, `read_artifacts`, `save`, `edit`, `diff`, `publish`, `resolve` (or any repo-oriented MCP tools) are present, you're running via the AIDOS GitHub MCP Connector. Use those tools for all repo operations — don't try to shell out or use a filesystem.
 - **Direct filesystem access?** If you can read and write files directly (e.g. Claude Code), work with `.aidos/` files as normal project files.
 - **Neither?** You're in a plain chat with no repo access. Work with files the human pastes in, and render artifacts inline for them to copy out.
 
