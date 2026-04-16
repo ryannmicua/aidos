@@ -134,6 +134,49 @@ export function buildMergedTree(detection, resolvedByPath) {
 }
 
 /**
+ * Orchestrate the resolve() tool's work.
+ *
+ * Steps:
+ *   1. detectConflicts against current live state.
+ *   2. stalenessCheck per incoming packet.
+ *   3. If stale OR live conflict set contains a path the agent didn't send →
+ *      return fresh { status: "conflict", conflicts: [...] } packet.
+ *   4. Otherwise buildMergedTree + createTree + createCommit(two parents) +
+ *      updateRef. Return { status: "resolved", commit }.
+ */
+export async function resolveConflicts(client, owner, repo, branch, mainBranch, merges) {
+  const mergesByPath = new Map(merges.map((m) => [m.path, m]));
+
+  const detection = await detectConflicts(client, owner, repo, branch, mainBranch);
+
+  // Step 2: staleness per incoming packet.
+  const stale = await stalenessCheck(client, owner, repo, mergesByPath, detection);
+
+  // Step 3: paths conflicting now but not in incoming merges.
+  const missing = detection.conflicts.filter((p) => !mergesByPath.has(p));
+
+  if (stale.length > 0 || missing.length > 0) {
+    // Rebuild the fresh conflict packet from current detection — the agent
+    // gets a complete, up-to-date view to re-present to the user.
+    return buildConflictPacket(client, owner, repo, detection);
+  }
+
+  // Step 4: build tree and commit.
+  const treeEntries = buildMergedTree(detection, mergesByPath);
+  const newTree = await client.createTree(owner, repo, detection.baseSha, treeEntries);
+  const commit = await client.createCommit(
+    owner,
+    repo,
+    `[aidos] Merge ${mainBranch} into ${branch} (resolved ${merges.length} conflict(s))`,
+    newTree.sha,
+    [detection.branchSha, detection.mainSha],
+  );
+  await client.updateRef(owner, repo, branch, commit.sha);
+
+  return { status: "resolved", commit: commit.sha };
+}
+
+/**
  * Build the conflict packet the agent sees. For each conflicting path, fetch
  * base/theirs/yours content and include a rendered conflict-marker form.
  */

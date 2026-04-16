@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { indexTree, detectConflicts, buildConflictPacket, stalenessCheck, buildMergedTree } from "../merge.js";
+import { indexTree, detectConflicts, buildConflictPacket, stalenessCheck, buildMergedTree, resolveConflicts } from "../merge.js";
 
 describe("indexTree", () => {
   it("maps blob paths to their blob SHAs", () => {
@@ -353,5 +353,118 @@ describe("buildMergedTree", () => {
     });
     const entries = buildMergedTree(det, new Map());
     assert.equal(entries.find((e) => e.path === "old.md"), undefined);
+  });
+});
+
+function resolveTestClient({ baseTree, mainTree, branchTree, blobs, createTreeSha, createCommitSha }) {
+  const trees = { "base-sha": baseTree, "main-sha": mainTree, "branch-sha": branchTree };
+  const calls = { createTree: [], createCommit: [], updateRef: [] };
+  return {
+    calls,
+    compare: async () => ({ merge_base_commit: { sha: "base-sha" } }),
+    getBranch: async (o, r, b) => ({ commit: { sha: b === "main" ? "main-sha" : "branch-sha" } }),
+    getTree: async (o, r, sha) => trees[sha] || { tree: [] },
+    getBlob: async (o, r, sha) => ({
+      content: Buffer.from(blobs[sha] || "").toString("base64"),
+      encoding: "base64",
+    }),
+    createTree: async (o, r, baseTreeSha, entries) => {
+      calls.createTree.push({ baseTreeSha, entries });
+      return { sha: createTreeSha };
+    },
+    createCommit: async (o, r, message, tree, parents) => {
+      calls.createCommit.push({ message, tree, parents });
+      return { sha: createCommitSha };
+    },
+    updateRef: async (o, r, b, sha) => {
+      calls.updateRef.push({ branch: b, sha });
+      return {};
+    },
+  };
+}
+
+describe("resolveConflicts", () => {
+  it("commits a two-parent merge on the happy path", async () => {
+    const client = resolveTestClient({
+      baseTree:   { tree: [{ path: "a.md", type: "blob", sha: "a-base" }] },
+      mainTree:   { tree: [{ path: "a.md", type: "blob", sha: "a-main" }] },
+      branchTree: { tree: [{ path: "a.md", type: "blob", sha: "a-branch" }] },
+      blobs: { "a-main": "MAIN", "a-branch": "BRANCH", "a-base": "BASE" },
+      createTreeSha: "new-tree-sha",
+      createCommitSha: "merge-commit-sha",
+    });
+
+    const result = await resolveConflicts(client, "org", "repo", "aidos/simon", "main", [
+      {
+        path: "a.md",
+        original: { base: "BASE", theirs: "MAIN", yours: "BRANCH" },
+        resolved: "RESOLVED",
+      },
+    ]);
+
+    assert.equal(result.status, "resolved");
+    assert.equal(result.commit, "merge-commit-sha");
+    assert.equal(client.calls.createCommit.length, 1);
+    assert.deepEqual(client.calls.createCommit[0].parents, ["branch-sha", "main-sha"]);
+    assert.equal(client.calls.updateRef[0].sha, "merge-commit-sha");
+  });
+
+  it("returns a fresh conflict packet when original.theirs drifted", async () => {
+    const client = resolveTestClient({
+      baseTree:   { tree: [{ path: "a.md", type: "blob", sha: "a-base" }] },
+      mainTree:   { tree: [{ path: "a.md", type: "blob", sha: "a-main-new" }] },
+      branchTree: { tree: [{ path: "a.md", type: "blob", sha: "a-branch" }] },
+      blobs: { "a-main-new": "NEW MAIN", "a-branch": "BRANCH", "a-base": "BASE" },
+      createTreeSha: "x", createCommitSha: "x",
+    });
+
+    const result = await resolveConflicts(client, "org", "repo", "aidos/simon", "main", [
+      {
+        path: "a.md",
+        original: { base: "BASE", theirs: "OLD MAIN", yours: "BRANCH" },
+        resolved: "RESOLVED",
+      },
+    ]);
+
+    assert.equal(result.status, "conflict");
+    assert.equal(result.conflicts[0].path, "a.md");
+    assert.equal(result.conflicts[0].theirs, "NEW MAIN");
+    assert.equal(client.calls.createCommit.length, 0, "must not commit on stale resolution");
+  });
+
+  it("returns a fresh conflict packet when a new conflict appeared", async () => {
+    const client = resolveTestClient({
+      baseTree:   { tree: [
+        { path: "a.md", type: "blob", sha: "a-base" },
+        { path: "b.md", type: "blob", sha: "b-base" },
+      ]},
+      mainTree:   { tree: [
+        { path: "a.md", type: "blob", sha: "a-main" },
+        { path: "b.md", type: "blob", sha: "b-main" },
+      ]},
+      branchTree: { tree: [
+        { path: "a.md", type: "blob", sha: "a-branch" },
+        { path: "b.md", type: "blob", sha: "b-branch" },
+      ]},
+      blobs: {
+        "a-main": "MAIN A", "a-branch": "BRANCH A", "a-base": "BASE A",
+        "b-main": "MAIN B", "b-branch": "BRANCH B", "b-base": "BASE B",
+      },
+      createTreeSha: "x", createCommitSha: "x",
+    });
+
+    const result = await resolveConflicts(client, "org", "repo", "aidos/simon", "main", [
+      {
+        path: "a.md",
+        original: { base: "BASE A", theirs: "MAIN A", yours: "BRANCH A" },
+        resolved: "RESOLVED A",
+      },
+      // b.md conflict was missed by the agent
+    ]);
+
+    assert.equal(result.status, "conflict");
+    const paths = result.conflicts.map((c) => c.path);
+    assert.ok(paths.includes("b.md"), "new conflict path b.md must be surfaced");
+    assert.equal(client.calls.createCommit.length, 0);
   });
 });
