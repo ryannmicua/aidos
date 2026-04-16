@@ -38,7 +38,22 @@ describe("preflightPublish", () => {
 
   it("fails on merge conflict (behind_by > 0 with diverged history)", async () => {
     const client = mockClient({
-      compare: async () => ({ ahead_by: 1, behind_by: 2, files: [] }),
+      compare: async () => ({
+        ahead_by: 1,
+        behind_by: 2,
+        files: [],
+        merge_base_commit: { sha: "base-sha" },
+      }),
+      getBranch: async (o, r, b) => ({ commit: { sha: b === "main" ? "m1" : "b1" } }),
+      getTree: async (o, r, sha) => {
+        if (sha === "base-sha") return { tree: [{ path: "x.md", type: "blob", sha: "x0" }] };
+        if (sha === "m1")       return { tree: [{ path: "x.md", type: "blob", sha: "x-main" }] };
+        if (sha === "b1")       return { tree: [{ path: "x.md", type: "blob", sha: "x-branch" }] };
+      },
+      getBlob: async (o, r, sha) => ({
+        content: Buffer.from({ "x0": "B", "x-main": "M", "x-branch": "R" }[sha]).toString("base64"),
+        encoding: "base64",
+      }),
     });
     const result = await preflightPublish(client, "org", "repo", "aidos/simon", {
       strategy: "pr", target: "main", reviewers: [],
@@ -46,6 +61,7 @@ describe("preflightPublish", () => {
     assert.equal(result.ok, false);
     const conflict = result.checks.find((c) => c.name === "conflicts");
     assert.ok(conflict && !conflict.pass);
+    assert.equal(result.conflict_packet?.status, "conflict");
   });
 
   it("validates individual reviewer via lookupUser", async () => {
