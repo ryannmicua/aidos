@@ -34,6 +34,8 @@ When the user describes work they want to deliver, you:
 | `templates/definition.md` | Definition artifact template with section-to-rubric mapping. |
 | `templates/retrospective.md` | Retrospective template for rubric evolution. |
 | `CONTRIBUTING.md` | How to propose rubric changes — the contribution model for evolving the framework. |
+| `VERSION` | **Framework version.** Plain-text file containing the current AIDOS framework semver (e.g. `1.0.0`). Read on session start — used to stamp new artifacts and compare against existing files' `AIDOS Version` metadata. |
+| `migrations/` | Directory of `vX.Y.Z-to-vX.Y+1.0.md` files describing how to upgrade artifacts across minor framework bumps. Read only when a file is behind and the user accepts an upgrade. |
 
 ## Environment
 
