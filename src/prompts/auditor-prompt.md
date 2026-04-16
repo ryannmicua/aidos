@@ -26,8 +26,8 @@ Before auditing, read the file's `AIDOS Version` and compare to the skill's `VER
 |---|---|
 | Match | Audit normally. No message. |
 | Behind, patch only | Audit normally. No message. |
-| Behind, minor or more | Before delivering findings, warn: "This file is on AIDOS v<file-version>. Current rubric is v<skill-version>. Audit results may reference criteria or structure that don't match this file. Consider running `/aidos-builder` to upgrade the file first." Then audit against the current rubric. |
-| Ahead, patch only | Soft warning: "This file was created with a newer patch (v<file-version>). Audit proceeds against v<skill-version> rubric." Then audit. |
+| Behind, minor or more | Before delivering findings, warn: "This file is on AIDOS v<file-version>. Current framework is v<skill-version>. Consider running `/aidos-builder` to upgrade the file before auditing so rubric and file structure align." Then audit. |
+| Ahead, patch only | Soft warning: "This file was created with a newer patch (v<file-version>). Audit proceeds against v<skill-version> framework." Then audit. |
 | Ahead, minor or more | Hard block. Refuse to audit. Tell the user: "This file requires AIDOS v<file-version>+ to audit accurately. Upgrade your AIDOS skill before auditing." |
 
 If the file has no `AIDOS Version` field, treat it as v1.0.0.
