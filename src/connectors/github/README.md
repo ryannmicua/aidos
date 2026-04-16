@@ -105,11 +105,12 @@ The auth flow is two-phase: the first call initiates device flow and returns the
 | `open_workspace` | Resolve repo (fuzzy match supported), create/sync working branch, discover `.aidos/` folders, validate manifest, surface work-in-progress and last publish status |
 | `read_artifacts` | Batch read all files from a `.aidos/` folder |
 | `save` | Preview files to commit (default) or commit them (`confirm=true`) |
+| `edit` | Surgical edits to existing files using `old_string`/`new_string` — faster than `save` and preserves untouched content |
 | `diff` | Show changes vs target branch |
 | `publish` | Run pre-flight checks (branch exists, conflicts, reviewers) and preview; execute on `confirm=true` |
 | `resolve` | Apply conflict resolutions returned by `publish` — commits the merge and opens the PR in one call |
 
-`save` and `publish` are two-phase: the first call returns a preview, the second call with `confirm=true` performs the action. This gives the AI a chance to show you the plan before changes hit the repo.
+`save` and `publish` are two-phase: the first call returns a preview, the second call with `confirm=true` performs the action. `edit` is one-phase — the `old_string` field is the verification that the agent knows what it's changing, so no preview round-trip is needed.
 
 ### Workflow
 
@@ -118,7 +119,8 @@ open_workspace("my-repo") → creates aidos/{you} branch, finds .aidos/ folders,
                             validates manifest, reports WIP if any
 read_artifacts(...)       → loads all artifacts into AI context
 [work with AI]
-save(files, message)      → returns preview of files and commit message
+edit(edits)               → surgical change to existing files (preferred for edits)
+save(files, message)      → preview of full-file write (for new files)
 save(..., confirm=true)   → atomic commit to working branch
 diff()                    → review changes vs target branch
 publish()                 → runs pre-flight, opens PR on clean sync,
@@ -156,6 +158,8 @@ A typical non-coder session looks like this. Your AI assistant handles the tool 
 > *Claude:* Opened PR #42 — [link]. Merging will also trigger the Confluence publish workflow per your manifest. Done.
 
 That's the happy path. Two-phase prompts (`save` and `publish` both preview before acting) give you a chance to check what's about to happen before anything lands in the repo.
+
+For most revisions the AI will use `edit` under the hood — a surgical change that only sends the exact old/new text through, rather than regenerating the whole file. You'll notice this is fast (seconds) compared to `save`, which rewrites the full file and can take minutes for a large artifact. The AI picks the right tool; you don't need to think about which.
 
 When `main` has diverged and your changes clash with someone else's, `publish` returns a conflict packet instead — see the next section.
 
