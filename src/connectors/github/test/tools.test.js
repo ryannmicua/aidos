@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch, publishChanges, resolveConflictsAndPublish } from "../server.js";
+import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch, publishChanges, resolveConflictsAndPublish, editArtifacts } from "../server.js";
 
 function mockClient(overrides = {}) {
   const defaults = {
@@ -532,5 +532,134 @@ describe("resolveConflictsAndPublish", () => {
 
     assert.equal(result.status, "conflict");
     assert.equal(createPullCalled, false);
+  });
+});
+
+describe("editArtifacts", () => {
+  function editTestClient({ files = {}, blobs = {} } = {}) {
+    const calls = { createTree: [], createCommit: [], updateRef: [] };
+    return {
+      calls,
+      getBranch: async () => ({ commit: { sha: "branch-sha" } }),
+      getTree: async () => ({
+        sha: "tree-sha",
+        tree: Object.entries(files).map(([path, sha]) => ({ path, type: "blob", sha })),
+      }),
+      getBlob: async (o, r, sha) => ({
+        content: Buffer.from(blobs[sha] || "").toString("base64"),
+        encoding: "base64",
+      }),
+      createTree: async (o, r, baseTree, entries) => {
+        calls.createTree.push({ baseTree, entries });
+        return { sha: "new-tree-sha" };
+      },
+      createCommit: async (o, r, msg, tree, parents) => {
+        calls.createCommit.push({ msg, tree, parents });
+        return { sha: "new-commit-sha" };
+      },
+      updateRef: async (o, r, b, sha) => {
+        calls.updateRef.push({ branch: b, sha });
+        return {};
+      },
+    };
+  }
+
+  it("rejects when file doesn't exist on branch", async () => {
+    const client = editTestClient({ files: {} });
+    await assert.rejects(
+      () =>
+        editArtifacts(client, "org", "repo", "aidos/simon", [
+          { path: "missing.md", old_string: "x", new_string: "y" },
+        ], "test"),
+      /File not found on branch: missing\.md/,
+    );
+    assert.equal(client.calls.createCommit.length, 0, "no commit on validation failure");
+  });
+
+  it("commits a single-file edit atomically", async () => {
+    const client = editTestClient({
+      files: { "f1.md": "blob1" },
+      blobs: { blob1: "Hello world" },
+    });
+
+    const result = await editArtifacts(client, "org", "repo", "aidos/simon", [
+      { path: "f1.md", old_string: "world", new_string: "there" },
+    ], "Test edit");
+
+    assert.equal(result.commit, "new-commit-sha");
+    assert.equal(result.files_changed, 1);
+    assert.equal(client.calls.createTree.length, 1);
+    assert.equal(client.calls.createCommit.length, 1);
+    assert.equal(client.calls.updateRef.length, 1);
+
+    const treeEntry = client.calls.createTree[0].entries.find((e) => e.path === "f1.md");
+    assert.equal(treeEntry.content, "Hello there");
+    assert.equal(treeEntry.mode, "100644");
+    assert.equal(treeEntry.type, "blob");
+  });
+
+  it("commits a multi-file batch as a single commit", async () => {
+    const client = editTestClient({
+      files: { "a.md": "blobA", "b.md": "blobB" },
+      blobs: { blobA: "hello", blobB: "world" },
+    });
+
+    const result = await editArtifacts(client, "org", "repo", "aidos/simon", [
+      { path: "a.md", old_string: "hello", new_string: "hi" },
+      { path: "b.md", old_string: "world", new_string: "universe" },
+    ], "Multi-file test");
+
+    assert.equal(result.commit, "new-commit-sha");
+    assert.equal(result.files_changed, 2);
+    assert.equal(client.calls.createCommit.length, 1, "single commit for batch");
+    assert.equal(client.calls.createTree[0].entries.length, 2);
+  });
+
+  it("applies multiple edits to the same file sequentially", async () => {
+    const client = editTestClient({
+      files: { "x.md": "blobX" },
+      blobs: { blobX: "Hello world" },
+    });
+
+    const result = await editArtifacts(client, "org", "repo", "aidos/simon", [
+      { path: "x.md", old_string: "Hello", new_string: "Goodbye" },
+      { path: "x.md", old_string: "Goodbye world", new_string: "Farewell universe" },
+    ], "Sequential");
+
+    assert.equal(result.files_changed, 1);
+    const entry = client.calls.createTree[0].entries.find((e) => e.path === "x.md");
+    assert.equal(entry.content, "Farewell universe");
+  });
+
+  it("is atomic when one file's edits fail", async () => {
+    const client = editTestClient({
+      files: { "a.md": "blobA", "b.md": "blobB" },
+      blobs: { blobA: "hello", blobB: "world" },
+    });
+
+    await assert.rejects(
+      () =>
+        editArtifacts(client, "org", "repo", "aidos/simon", [
+          { path: "a.md", old_string: "hello", new_string: "hi" },
+          { path: "b.md", old_string: "missing", new_string: "x" },
+        ], "test"),
+      /Edit failed for b\.md/,
+    );
+
+    assert.equal(client.calls.createCommit.length, 0, "no commit when any file fails");
+    assert.equal(client.calls.updateRef.length, 0, "no ref update when any file fails");
+  });
+
+  it("prefixes the commit message with [aidos]", async () => {
+    const client = editTestClient({
+      files: { "f.md": "blobF" },
+      blobs: { blobF: "abc" },
+    });
+
+    await editArtifacts(client, "org", "repo", "aidos/simon", [
+      { path: "f.md", old_string: "abc", new_string: "xyz" },
+    ], "Fix typo");
+
+    assert.match(client.calls.createCommit[0].msg, /^\[aidos\] Fix typo$/);
   });
 });

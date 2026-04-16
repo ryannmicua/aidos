@@ -8,8 +8,9 @@ import { ensureAuth } from "./auth.js";
 import { mapGitHubError } from "./errors.js";
 import { validateManifest } from "./manifest.js";
 import { detectConflicts, buildConflictPacket, resolveConflicts } from "./merge.js";
+import { applyEdits } from "./edit.js";
 
-const server = new McpServer({ name: "aidos-github", version: "1.0.1" });
+const server = new McpServer({ name: "aidos-github", version: "1.0.2" });
 
 const session = {
   client: null,
@@ -357,6 +358,67 @@ export async function saveArtifacts(client, owner, repo, branch, files, message)
   await client.updateRef(owner, repo, branch, newCommit.sha);
 
   return { commit: newCommit.sha, files_changed: files.length };
+}
+
+/**
+ * Fetch each file referenced in edits[] from the branch, apply its edits via
+ * applyEdits, and commit the results atomically as a single commit.
+ *
+ * edits: Array<{ path, old_string, new_string, replace_all? }>
+ *
+ * Returns { commit: <sha>, files_changed: <n> } on success.
+ * Throws Error with clean message on any failure (no partial commit).
+ */
+export async function editArtifacts(client, owner, repo, branch, edits, message) {
+  if (!edits || edits.length === 0) {
+    throw new Error("No edits provided.");
+  }
+
+  // Group edits by path, preserving order.
+  const editsByPath = new Map();
+  for (const edit of edits) {
+    if (!editsByPath.has(edit.path)) editsByPath.set(edit.path, []);
+    editsByPath.get(edit.path).push(edit);
+  }
+
+  const branchInfo = await client.getBranch(owner, repo, branch);
+  const headSha = branchInfo.commit.sha;
+  const tree = await client.getTree(owner, repo, headSha);
+
+  const updatedFiles = [];
+  for (const [path, pathEdits] of editsByPath) {
+    const entry = tree.tree.find((e) => e.path === path && e.type === "blob");
+    if (!entry) {
+      throw new Error(`File not found on branch: ${path}. Use save() to create new files.`);
+    }
+    const blob = await client.getBlob(owner, repo, entry.sha);
+    const content = Buffer.from(blob.content, blob.encoding || "base64").toString("utf8");
+    const { newContent, error } = applyEdits(content, pathEdits);
+    if (error) {
+      throw new Error(`Edit failed for ${path}: ${error}`);
+    }
+    updatedFiles.push({ path, content: newContent });
+  }
+
+  const treeEntries = updatedFiles.map((f) => ({
+    path: f.path,
+    mode: "100644",
+    type: "blob",
+    content: f.content,
+  }));
+
+  const newTree = await client.createTree(owner, repo, tree.sha, treeEntries);
+  const commitMessage = `[aidos] ${message}`;
+  const newCommit = await client.createCommit(
+    owner,
+    repo,
+    commitMessage,
+    newTree.sha,
+    [headSha],
+  );
+  await client.updateRef(owner, repo, branch, newCommit.sha);
+
+  return { commit: newCommit.sha, files_changed: updatedFiles.length };
 }
 
 /**
@@ -792,6 +854,39 @@ server.registerTool(
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
       return textResult(translateToolError(err, { op: "resolve", target }));
+    }
+  },
+);
+
+server.registerTool(
+  "edit",
+  {
+    title: "Edit AIDOS Artifacts",
+    description:
+      "Surgical edits to existing files on a branch. For each edit, supply the exact old_string currently in the file and the new_string to replace it with. Edits across multiple files are committed as a single atomic commit. Use this instead of save() whenever making partial changes — it is faster and preserves file content the agent didn't intend to change. Always read_artifacts first so old_string matches exactly. Multiple edits targeting the same path are applied sequentially; a later edit sees the result of earlier ones. Set replace_all: true if old_string appears more than once and you want every occurrence replaced.",
+    inputSchema: z.object({
+      repo: z.string().describe("Repository as owner/repo"),
+      branch: z.string().describe("Branch to commit to"),
+      edits: z.array(
+        z.object({
+          path: z.string().describe("File path relative to repo root"),
+          old_string: z.string().describe("Exact text to replace (must be present in the current file)"),
+          new_string: z.string().describe("Replacement text"),
+          replace_all: z.boolean().default(false).describe("Replace every occurrence instead of exactly one"),
+        }),
+      ).describe("Per-file edits; multiple edits to the same path apply sequentially"),
+      message: z.string().describe("Commit message (will be prefixed with [aidos])"),
+    }),
+  },
+  async ({ repo, branch, edits, message }) => {
+    const auth = await requireAuth();
+    if (!auth.authenticated) return textResult(auth.message);
+    const [owner, repoName] = repo.split("/");
+    try {
+      const result = await editArtifacts(auth.client, owner, repoName, branch, edits, message);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return textResult(translateToolError(err, { op: "edit" }));
     }
   },
 );

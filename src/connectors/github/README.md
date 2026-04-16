@@ -2,7 +2,7 @@
 
 A local MCP server that gives AI agents (Claude Desktop, Copilot) read/write access to `.aidos/` folders in GitHub repos.
 
-Lets non-technical users author AIDOS artifacts via AI without ever touching Git. The server runs as a subprocess of your MCP client and exposes 6 tools that the AI uses to resolve repos, read artifacts, save changes, review diffs, publish PRs, and resolve merge conflicts.
+Lets non-technical users author AIDOS artifacts via AI without ever touching Git. The server runs as a subprocess of your MCP client and exposes 7 tools that the AI uses to resolve repos, read artifacts, save changes, surgically edit files, review diffs, publish PRs, and resolve merge conflicts.
 
 ---
 
@@ -105,11 +105,12 @@ The auth flow is two-phase: the first call initiates device flow and returns the
 | `open_workspace` | Resolve repo (fuzzy match supported), create/sync working branch, discover `.aidos/` folders, validate manifest, surface work-in-progress and last publish status |
 | `read_artifacts` | Batch read all files from a `.aidos/` folder |
 | `save` | Preview files to commit (default) or commit them (`confirm=true`) |
+| `edit` | Surgical edits to existing files using `old_string`/`new_string` — faster than `save` and preserves untouched content |
 | `diff` | Show changes vs target branch |
 | `publish` | Run pre-flight checks (branch exists, conflicts, reviewers) and preview; execute on `confirm=true` |
 | `resolve` | Apply conflict resolutions returned by `publish` — commits the merge and opens the PR in one call |
 
-`save` and `publish` are two-phase: the first call returns a preview, the second call with `confirm=true` performs the action. This gives the AI a chance to show you the plan before changes hit the repo.
+`save` and `publish` are two-phase: the first call returns a preview, the second call with `confirm=true` performs the action. `edit` is one-phase — the `old_string` field is the verification that the agent knows what it's changing, so no preview round-trip is needed.
 
 ### Workflow
 
@@ -118,7 +119,8 @@ open_workspace("my-repo") → creates aidos/{you} branch, finds .aidos/ folders,
                             validates manifest, reports WIP if any
 read_artifacts(...)       → loads all artifacts into AI context
 [work with AI]
-save(files, message)      → returns preview of files and commit message
+edit(edits)               → surgical change to existing files (preferred for edits)
+save(files, message)      → preview of full-file write (for new files)
 save(..., confirm=true)   → atomic commit to working branch
 diff()                    → review changes vs target branch
 publish()                 → runs pre-flight, opens PR on clean sync,
@@ -156,6 +158,8 @@ A typical non-coder session looks like this. Your AI assistant handles the tool 
 > *Claude:* Opened PR #42 — [link]. Merging will also trigger the Confluence publish workflow per your manifest. Done.
 
 That's the happy path. Two-phase prompts (`save` and `publish` both preview before acting) give you a chance to check what's about to happen before anything lands in the repo.
+
+For most revisions the AI will use `edit` under the hood — a surgical change that only sends the exact old/new text through, rather than regenerating the whole file. You'll notice this is fast (seconds) compared to `save`, which rewrites the full file and can take minutes for a large artifact. The AI picks the right tool; you don't need to think about which.
 
 When `main` has diverged and your changes clash with someone else's, `publish` returns a conflict packet instead — see the next section.
 
@@ -216,7 +220,7 @@ npm install
 npm test
 ```
 
-113 tests across 24 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
+130 tests across 26 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
 
 ### Project structure
 
@@ -226,6 +230,7 @@ src/connectors/github/
 ├── github.js                   ← GitHub REST API client (fetch-based)
 ├── auth.js                     ← Two-phase device flow + token cache
 ├── errors.js                   ← User-facing error mapper
+├── edit.js                     ← Surgical string-replacement logic for the edit tool
 ├── manifest.js                 ← Manifest schema validation (ajv)
 ├── manifest.schema.json        ← JSON Schema for .aidos/manifest.json
 ├── merge.js                    ← Conflict detection, packet building, Flavor B 3-way merge orchestration
@@ -234,6 +239,7 @@ src/connectors/github/
 └── test/
     ├── auth.test.js            ← Token cache tests
     ├── auth-flow.test.js       ← Two-phase device flow tests
+    ├── edit.test.js            ← Edit logic unit tests
     ├── errors.test.js          ← Error mapper tests
     ├── github.test.js          ← API client unit tests
     ├── integration.test.js     ← End-to-end publish→conflict→resolve loop tests
