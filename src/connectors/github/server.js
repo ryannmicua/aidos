@@ -9,7 +9,7 @@ import { mapGitHubError } from "./errors.js";
 import { validateManifest } from "./manifest.js";
 import { detectConflicts, buildConflictPacket, resolveConflicts } from "./merge.js";
 
-const server = new McpServer({ name: "aidos-github", version: "1.0.0" });
+const server = new McpServer({ name: "aidos-github", version: "1.0.1" });
 
 const session = {
   client: null,
