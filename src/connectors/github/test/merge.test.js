@@ -333,4 +333,25 @@ describe("buildMergedTree", () => {
     assert.equal(entry.mode, "100644");
     assert.equal(entry.type, "blob");
   });
+
+  it("takes the common SHA when both sides made the same change", () => {
+    const det = makeDetection({
+      base:   { "c.md": "c0" },
+      main:   { "c.md": "c1" },
+      branch: { "c.md": "c1" },
+    });
+    const entries = buildMergedTree(det, new Map());
+    const c = entries.find((e) => e.path === "c.md");
+    assert.equal(c.sha, "c1");
+  });
+
+  it("omits files deleted on both main and branch", () => {
+    const det = makeDetection({
+      base:   { "old.md": "o0" },
+      main:   {},
+      branch: {},
+    });
+    const entries = buildMergedTree(det, new Map());
+    assert.equal(entries.find((e) => e.path === "old.md"), undefined);
+  });
 });

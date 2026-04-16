@@ -119,7 +119,7 @@ export function buildMergedTree(detection, resolvedByPath) {
 
     // Choose the winning SHA.
     let sha;
-    if (!onMain && onBranch) sha = r;        // branch-only retained (e.g. deleted on main but modified on branch — handled as conflict earlier; defensive)
+    if (!onMain && onBranch) sha = r;        // branch-only retained — if this is a modify/delete conflict it should have been resolved upstream
     else if (!onBranch && onMain) sha = m;   // main-only retained
     else if (m === r) sha = m;               // same on both (including unchanged from base)
     else if (b === m) sha = r;               // branch-only change
