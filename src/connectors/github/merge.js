@@ -56,3 +56,37 @@ export async function detectConflicts(client, owner, repo, branch, mainBranch) {
 
   return { conflicts, baseSha, mainSha, branchSha, baseMap, mainMap, branchMap };
 }
+
+async function fetchBlobText(client, owner, repo, sha) {
+  if (!sha) return "";
+  const blob = await client.getBlob(owner, repo, sha);
+  return Buffer.from(blob.content, blob.encoding || "base64").toString("utf8");
+}
+
+function renderMarkers(yours, theirs) {
+  return `<<<<<<< yours\n${yours}\n=======\n${theirs}\n>>>>>>> theirs`;
+}
+
+/**
+ * Build the conflict packet the agent sees. For each conflicting path, fetch
+ * base/theirs/yours content and include a rendered conflict-marker form.
+ */
+export async function buildConflictPacket(client, owner, repo, detection) {
+  const conflicts = await Promise.all(
+    detection.conflicts.map(async (path) => {
+      const [base, theirs, yours] = await Promise.all([
+        fetchBlobText(client, owner, repo, detection.baseMap.get(path)),
+        fetchBlobText(client, owner, repo, detection.mainMap.get(path)),
+        fetchBlobText(client, owner, repo, detection.branchMap.get(path)),
+      ]);
+      return { path, base, theirs, yours, marker_form: renderMarkers(yours, theirs) };
+    }),
+  );
+  return {
+    status: "conflict",
+    conflicts,
+    instructions:
+      "For each conflict, propose a resolution to the user. Call resolve() " +
+      "with the user's choice for each file, passing back the original block verbatim.",
+  };
+}

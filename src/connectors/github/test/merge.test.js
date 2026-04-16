@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { indexTree, detectConflicts } from "../merge.js";
+import { indexTree, detectConflicts, buildConflictPacket } from "../merge.js";
 
 describe("indexTree", () => {
   it("maps blob paths to their blob SHAs", () => {
@@ -109,5 +109,73 @@ describe("detectConflicts", () => {
     });
     const result = await detectConflicts(client, "org", "repo", "aidos/simon", "main");
     assert.deepEqual(result.conflicts, ["x.md"]);
+  });
+});
+
+describe("buildConflictPacket", () => {
+  it("returns base/theirs/yours content for each conflicting path", async () => {
+    const detection = {
+      conflicts: ["a.md"],
+      baseMap: new Map([["a.md", "a-base"]]),
+      mainMap: new Map([["a.md", "a-main"]]),
+      branchMap: new Map([["a.md", "a-branch"]]),
+    };
+    const blobs = {
+      "a-base": "BASE CONTENT",
+      "a-main": "MAIN CONTENT",
+      "a-branch": "BRANCH CONTENT",
+    };
+    const client = {
+      getBlob: async (o, r, sha) => ({
+        content: Buffer.from(blobs[sha]).toString("base64"),
+        encoding: "base64",
+      }),
+    };
+
+    const packet = await buildConflictPacket(client, "org", "repo", detection);
+
+    assert.equal(packet.status, "conflict");
+    assert.equal(packet.conflicts.length, 1);
+    const c = packet.conflicts[0];
+    assert.equal(c.path, "a.md");
+    assert.equal(c.base, "BASE CONTENT");
+    assert.equal(c.theirs, "MAIN CONTENT");
+    assert.equal(c.yours, "BRANCH CONTENT");
+    assert.match(c.marker_form, /<<<<<<< yours/);
+    assert.match(c.marker_form, /=======/);
+    assert.match(c.marker_form, />>>>>>> theirs/);
+  });
+
+  it("represents a deleted side as empty string", async () => {
+    const detection = {
+      conflicts: ["x.md"],
+      baseMap: new Map([["x.md", "x-base"]]),
+      mainMap: new Map([["x.md", "x-main"]]),
+      branchMap: new Map(), // deleted on branch
+    };
+    const blobs = { "x-base": "B", "x-main": "M" };
+    const client = {
+      getBlob: async (o, r, sha) => ({
+        content: Buffer.from(blobs[sha]).toString("base64"),
+        encoding: "base64",
+      }),
+    };
+
+    const packet = await buildConflictPacket(client, "org", "repo", detection);
+    assert.equal(packet.conflicts[0].yours, "");
+    assert.equal(packet.conflicts[0].theirs, "M");
+    assert.equal(packet.conflicts[0].base, "B");
+  });
+
+  it("includes instructions field", async () => {
+    const detection = {
+      conflicts: [],
+      baseMap: new Map(),
+      mainMap: new Map(),
+      branchMap: new Map(),
+    };
+    const client = { getBlob: async () => ({ content: "", encoding: "base64" }) };
+    const packet = await buildConflictPacket(client, "org", "repo", detection);
+    assert.match(packet.instructions, /call resolve/i);
   });
 });
