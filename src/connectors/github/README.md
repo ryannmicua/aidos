@@ -107,6 +107,7 @@ The auth flow is two-phase: the first call initiates device flow and returns the
 | `save` | Preview files to commit (default) or commit them (`confirm=true`) |
 | `diff` | Show changes vs target branch |
 | `publish` | Run pre-flight checks (branch exists, conflicts, reviewers) and preview; execute on `confirm=true` |
+| `resolve` | Apply conflict resolutions returned by `publish` — commits the merge and opens the PR in one call |
 
 `save` and `publish` are two-phase: the first call returns a preview, the second call with `confirm=true` performs the action. This gives the AI a chance to show you the plan before changes hit the repo.
 
@@ -120,9 +121,22 @@ read_artifacts(...)       → loads all artifacts into AI context
 save(files, message)      → returns preview of files and commit message
 save(..., confirm=true)   → atomic commit to working branch
 diff()                    → review changes vs target branch
-publish()                 → runs pre-flight, returns check report
-publish(..., confirm=true) → create PR or merge per manifest.json write config
+publish()                 → runs pre-flight, opens PR on clean sync,
+                            returns conflict packet if main diverged
+resolve(merges)           → echoes the packet back with user's resolutions,
+                            commits the merge, opens the PR
 ```
+
+### Handling conflicts
+
+When `main` has advanced since you last synced and your changes overlap with someone else's, `publish` can't auto-merge. Instead it returns a **conflict packet** — for each conflicting file, you'll see the common ancestor content, what's on main now, and what's on your branch.
+
+Your AI assistant will walk through each conflict with you and propose a merged version. When you're happy, the assistant calls `resolve` with your choices. The connector:
+1. Verifies the main content hasn't drifted since the packet was generated (if it has, you'll see a fresh conflict for that file).
+2. Commits a proper merge commit with both branches as parents.
+3. Opens the PR.
+
+If someone else pushed between your resolution and the `resolve` call, you'll just cycle through the flow one more time — the connector never silently drops anyone's changes.
 
 ### Manifest configuration
 
@@ -152,7 +166,7 @@ Each user gets one `aidos/{github-username}` branch per repo. The branch is crea
 
 ### Publish side-effect
 
-If the repo's `.aidos/manifest.json` has a `publish.*` section (e.g. `publish.confluence`), a merge of the working branch into the target branch will trigger a publish via GitHub Actions. The builder skill warns about this before submit — you'll know before any side-effects happen.
+If the repo's `.aidos/manifest.json` has a `publish.*` section (e.g. `publish.confluence`), a merge of the working branch into the target branch will trigger a publish via GitHub Actions. The builder skill warns about this before publish — you'll know before any side-effects happen.
 
 ## Develop
 
@@ -190,13 +204,13 @@ src/connectors/github/
     ├── errors.test.js          ← Error mapper tests
     ├── github.test.js          ← API client unit tests
     ├── manifest.test.js        ← Manifest validation tests
-    ├── preflight.test.js       ← Submit pre-flight tests
+    ├── preflight.test.js       ← Publish pre-flight tests
     ├── rendering.test.js       ← Workspace dashboard rendering tests
     ├── resolve-repo.test.js    ← Fuzzy repo resolution tests
     └── tools.test.js           ← Tool logic tests with mocked client
 ```
 
-Each logic function is exported from `server.js` and unit-tested in isolation (see `resolveWorkspace`, `readArtifacts`, `saveArtifacts`, `diffBranch`, `submitChanges`). The MCP tool registrations wrap these functions thinly — test the logic, not the MCP protocol.
+Each logic function is exported from `server.js` and unit-tested in isolation (see `resolveWorkspace`, `readArtifacts`, `saveArtifacts`, `diffBranch`, `publishChanges`). The MCP tool registrations wrap these functions thinly — test the logic, not the MCP protocol.
 
 ### Run the server manually
 
@@ -237,8 +251,8 @@ You asked the AI to open the workspace again before completing the browser autho
 **Tools don't appear in Claude Desktop**
 Check the Claude Desktop logs (Settings → Developer → Open Logs Folder) for `aidos-github` errors. Common causes: wrong path to `server.js`, `npm install` not run, invalid JSON in `claude_desktop_config.json`.
 
-**"Your changes conflict with what's on main..."**
-Someone changed `.aidos/` files on the target branch while your `aidos/{you}` branch had unmerged work. A developer needs to resolve this manually with `git checkout aidos/{you} && git merge main`. This shows up in the `publish` pre-flight report before any changes are attempted.
+**"Publish returned a conflict packet"**
+Main has changes that overlap with yours. The AI will walk through each conflict and propose a resolution — confirm or adjust each one, and the `resolve` tool commits the merge and opens the PR. No terminal or manual `git merge` required.
 
 **Re-authenticate**
 Normally not needed — a revoked or expired token triggers a fresh device flow automatically on the next call. If you want to force it, delete `~/.aidos/auth.json` and `~/.aidos/pending_auth.json`.
