@@ -68,6 +68,22 @@ function renderMarkers(yours, theirs) {
 }
 
 /**
+ * Verify that each incoming merge packet's `original` block matches the live
+ * content for that path. Returns the list of paths whose `original` is stale.
+ */
+export async function stalenessCheck(client, owner, repo, mergesByPath, detection) {
+  const stale = [];
+  for (const [path, packet] of mergesByPath) {
+    const liveTheirs = await fetchBlobText(client, owner, repo, detection.mainMap.get(path));
+    const liveYours = await fetchBlobText(client, owner, repo, detection.branchMap.get(path));
+    if (packet.original.theirs !== liveTheirs || packet.original.yours !== liveYours) {
+      stale.push(path);
+    }
+  }
+  return stale;
+}
+
+/**
  * Build the conflict packet the agent sees. For each conflicting path, fetch
  * base/theirs/yours content and include a rendered conflict-marker form.
  */

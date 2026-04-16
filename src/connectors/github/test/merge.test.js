@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { indexTree, detectConflicts, buildConflictPacket } from "../merge.js";
+import { indexTree, detectConflicts, buildConflictPacket, stalenessCheck } from "../merge.js";
 
 describe("indexTree", () => {
   it("maps blob paths to their blob SHAs", () => {
@@ -177,5 +177,53 @@ describe("buildConflictPacket", () => {
     const client = { getBlob: async () => ({ content: "", encoding: "base64" }) };
     const packet = await buildConflictPacket(client, "org", "repo", detection);
     assert.match(packet.instructions, /call resolve/i);
+  });
+});
+
+describe("stalenessCheck", () => {
+  const detection = {
+    baseMap: new Map([["a.md", "a-base"]]),
+    mainMap: new Map([["a.md", "a-main-live"]]),
+    branchMap: new Map([["a.md", "a-branch-live"]]),
+  };
+  const blobs = {
+    "a-main-live": "LIVE MAIN",
+    "a-branch-live": "LIVE BRANCH",
+  };
+  const client = {
+    getBlob: async (o, r, sha) => ({
+      content: Buffer.from(blobs[sha] || "").toString("base64"),
+      encoding: "base64",
+    }),
+  };
+
+  it("returns [] when original matches live", async () => {
+    const merges = new Map([["a.md", {
+      path: "a.md",
+      original: { base: "whatever", theirs: "LIVE MAIN", yours: "LIVE BRANCH" },
+      resolved: "RESOLVED",
+    }]]);
+    const stale = await stalenessCheck(client, "org", "repo", merges, detection);
+    assert.deepEqual(stale, []);
+  });
+
+  it("flags a path when original.theirs mismatches live theirs", async () => {
+    const merges = new Map([["a.md", {
+      path: "a.md",
+      original: { base: "x", theirs: "STALE MAIN", yours: "LIVE BRANCH" },
+      resolved: "RESOLVED",
+    }]]);
+    const stale = await stalenessCheck(client, "org", "repo", merges, detection);
+    assert.deepEqual(stale, ["a.md"]);
+  });
+
+  it("flags a path when original.yours mismatches live yours", async () => {
+    const merges = new Map([["a.md", {
+      path: "a.md",
+      original: { base: "x", theirs: "LIVE MAIN", yours: "STALE BRANCH" },
+      resolved: "RESOLVED",
+    }]]);
+    const stale = await stalenessCheck(client, "org", "repo", merges, detection);
+    assert.deepEqual(stale, ["a.md"]);
   });
 });
