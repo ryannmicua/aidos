@@ -21,6 +21,7 @@ function Fix-PromptPaths {
     $content = Get-Content $File -Raw
     $content = $content -replace '`src/rubrics/', '`rubrics/'
     $content = $content -replace '`src/templates/', '`templates/'
+    $content = $content -replace '`src/migrations/', '`migrations/'
     $content = $content -replace '`src/framework\.md`', '`framework.md`'
     Set-Content $File $content -NoNewline
 }
