@@ -7,6 +7,7 @@ import { createClient } from "./github.js";
 import { ensureAuth } from "./auth.js";
 import { mapGitHubError } from "./errors.js";
 import { validateManifest } from "./manifest.js";
+import { detectConflicts, buildConflictPacket } from "./merge.js";
 
 const server = new McpServer({ name: "aidos-github", version: "1.0.0" });
 
@@ -439,10 +440,20 @@ export async function preflightPublish(client, owner, repo, branch, opts) {
     const cmp = await client.compare(owner, repo, target, branch);
     const behind = cmp.behind_by || 0;
     if (behind > 0) {
+      const detection = await detectConflicts(client, owner, repo, branch, target);
+      if (detection.conflicts.length > 0) {
+        const packet = await buildConflictPacket(client, owner, repo, detection);
+        checks.push({
+          name: "conflicts",
+          pass: false,
+          message: `Branch is ${behind} commit(s) behind ${target} with ${detection.conflicts.length} conflicting file(s).`,
+        });
+        return { ok: false, checks, conflict_packet: packet };
+      }
       checks.push({
         name: "conflicts",
-        pass: false,
-        message: `Branch is ${behind} commit(s) behind ${target} — possible conflict. A developer may need to merge ${target} into ${branch}.`,
+        pass: true,
+        message: `Branch is behind by ${behind} but no conflicts — merge will be clean at confirm time.`,
       });
     } else {
       checks.push({ name: "conflicts", pass: true, message: `No conflicts with ${target}` });
@@ -676,6 +687,9 @@ server.registerTool(
     try {
       const pre = await preflightPublish(auth.client, owner, repoName, branch, { strategy, target, reviewers });
       if (!pre.ok) {
+        if (pre.conflict_packet) {
+          return { content: [{ type: "text", text: JSON.stringify(pre.conflict_packet, null, 2) }] };
+        }
         return textResult(
           "Pre-flight found issues:\n\n" +
           pre.checks.map((c) => `${c.pass ? "✓" : "✗"} ${c.message}`).join("\n") +
