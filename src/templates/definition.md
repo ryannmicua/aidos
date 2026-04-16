@@ -53,6 +53,7 @@ Status progression:
 # Definition: [title]
 
 **Status:** DRAFT | REVIEW | ACCEPTED | CURRENT
+**AIDOS Version:** 1.0.0
 **Domain:** [product domain path]
 **Delivered:** [date]
 **Last Updated:** [date]

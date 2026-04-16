@@ -76,6 +76,7 @@ Coherence check:
 # Testing: [title]
 
 **Status:** DRAFT | REVIEW | ACCEPTED
+**AIDOS Version:** 1.0.0
 **Tech Design:** [link to Tech Design artifact]
 **Solution:** [link to Solution artifact]
 

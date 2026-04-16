@@ -9,3 +9,7 @@ Thumbs.db
 *.swo
 *~
 skills/dist/
+
+# Internal planning artifacts — not shipped in the public repo
+.claude/
+docs/superpowers/

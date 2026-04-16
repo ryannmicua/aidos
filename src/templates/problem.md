@@ -56,6 +56,7 @@ Scaling depth:
 # Problem: [title]
 
 **Status:** DRAFT | REVIEW | ACCEPTED
+**AIDOS Version:** 1.0.0
 **Parent:** [link to Epic problem, if this is Feature or Story scale]
 
 ---

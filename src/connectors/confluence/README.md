@@ -32,7 +32,7 @@ on:
 
 jobs:
   publish:
-    uses: shobman/aidos/.github/workflows/confluence-publish.yml@main
+    uses: shobman/aidos/.github/workflows/confluence-publish.yml@v1.0.0
     with:
       manifest-path: .aidos/manifest.json
       dry-run: ${{ github.event_name == 'pull_request' }}
@@ -40,6 +40,8 @@ jobs:
       confluence_email: ${{ secrets.CONFLUENCE_EMAIL }}
       confluence_token: ${{ secrets.CONFLUENCE_TOKEN }}
 ```
+
+> **Pin a tag, not `@main` or `@sha`.** AIDOS releases are tagged using semver (`vX.Y.Z`). Pinning to a tag means your workflow stays on a known-good version and only moves when you bump the pin. The tag to use is the current AIDOS framework version — see the `VERSION` file at the root of the AIDOS repo.
 
 PRs dry-run (preview in the Actions log), merges to main publish for real.
 
@@ -186,6 +188,30 @@ Each connector reads only its own key and ignores the rest.
 
 Validate your manifest against `manifest.schema.json` in this directory.
 
+## Org-Restricted Environments
+
+Some organisations block all public GitHub Actions by policy. If your org's workflow policy rejects `uses: shobman/aidos/...@v1.0.0`, you have two options:
+
+### Option 1 — Vendor the workflow
+
+Fork the AIDOS repo into your org, or copy `.github/workflows/confluence-publish.yml` and `src/connectors/confluence/` into an internal repo. Reference it by internal path instead:
+
+```yaml
+    uses: your-org/internal-aidos/.github/workflows/confluence-publish.yml@v1.0.0
+```
+
+Tag your internal fork with the same version as the upstream AIDOS release it's based on. When upstream cuts a new release, pull the changes in and re-tag.
+
+### Option 2 — Inline the workflow
+
+If forking isn't practical, write a workflow in your consuming repo that runs the publish script directly. You'll need to vendor `src/connectors/confluence/publish.js` (and its dependencies) into your repo as well. Track which upstream version you're based on in the workflow file's comments — the AIDOS version in your artifact files tells you which release's publish script to align with.
+
+### Tracking alignment
+
+In either option, the `**AIDOS Version:**` field in your artifact files is the source of truth for "what AIDOS version should this workflow be running". If artifacts are on v1.1.0, the workflow should be on the v1.1.0 release. Minor-version mismatches between artifacts and the workflow are not guaranteed compatible — migrate artifacts first, then bump the workflow pin. Patch-version drift is safe.
+
+---
+
 ## Develop
 
 ### Get the code
@@ -241,4 +267,4 @@ The script is ~700 lines, self-contained, ESM, uses Node 20+ built-in fetch. Fol
 
 ### Versioning
 
-No semver. The connector is versioned alongside the aidos repo. The GitHub Actions workflow pulls from `shobman/aidos@main` (or a pinned tag if you want stability). Bump the `CONNECTOR_VERSION` constant in `publish.js` to force republish of all pages — useful after output format changes.
+The connector is versioned alongside the aidos repo using semver (`vX.Y.Z`). Consumers pin the GitHub Actions workflow to a tag — see the Install section above for the tag-pinning requirement. Bump the `CONNECTOR_VERSION` constant in `publish.js` to force republish of all pages — useful after output format changes.

@@ -51,6 +51,7 @@ Scaling depth:
 # Solution: [title]
 
 **Status:** DRAFT | REVIEW | ACCEPTED
+**AIDOS Version:** 1.0.0
 **Problem:** [link to Problem artifact]
 
 ---

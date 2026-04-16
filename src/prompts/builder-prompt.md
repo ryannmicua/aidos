@@ -39,6 +39,46 @@ You don't pick one mode — the environment does. Inspect what's available and u
 
 ---
 
+## Versioning
+
+Every artifact template carries an `**AIDOS Version:** X.Y.Z` line in its metadata block. This records which version of the AIDOS framework spec the file was written against. It is the framework spec version — not the artifact's own revision number.
+
+The current framework version is stored in the `VERSION` file bundled with this skill. Read it before opening any artifact. When you scaffold new artifacts, stamp them with the version from `VERSION`. When you open an existing artifact, read the `AIDOS Version` from its metadata and compare to `VERSION`.
+
+Comparison rules:
+
+| File state | Example | Action |
+|---|---|---|
+| Match | File 1.2.0, skill 1.2.0 | Silent. Proceed. |
+| Behind, patch only | File 1.0.0, skill 1.0.2 | Silent. Proceed. |
+| Behind, minor or more | File 1.0.0, skill 1.2.0 | Warn the user: "This file is on AIDOS v1.0.0. Current framework is v1.2.0 — a migration may be available. Want me to upgrade this file?" Proceed whether they accept or decline. |
+| Ahead, patch only | File 1.2.1, skill 1.2.0 | Soft warning: "This file was created with a newer patch (v1.2.1). Proceed with caution." Proceed. |
+| Ahead, minor or more | File 1.3.0, skill 1.2.0 | Hard block. Refuse to modify. Tell the user: "This file requires AIDOS v1.3.0+. Upgrade your AIDOS skill before editing." |
+
+If a file has no `AIDOS Version` field, treat it as v1.0.0 and follow the rules above.
+
+### Per-file upgrade flow
+
+When a file is behind (minor or more) and the user accepts the upgrade offer:
+
+1. Read the migration files from `src/migrations/` in the bundled skill content that sit between the file's version and the current `VERSION`. If any step in the chain has no migration file (e.g. no `v1.0.0-to-v1.1.0.md` exists for the v1.0.0 → v1.1.0 hop), tell the user the automatic upgrade cannot cover that gap and stop. Offer that they upgrade their skill and try again, or migrate manually.
+2. For each migration step, in version order:
+   - Show the user the migration's `Summary` section.
+   - Apply only the instructions that affect the file in question — `File renames` entries whose source matches, `Content changes` entries that target this file, `Metadata changes` that apply to this file.
+   - Present the resulting diff.
+   - Get explicit user approval before writing.
+   - On approval: write the changes and update the file's `**AIDOS Version:**` line to the step's target version.
+   - On rejection: stop. The file keeps the last successfully applied version.
+3. After the last step (or early stop), confirm the final version to the user.
+
+Each file migrates independently. A workspace can have files at mixed versions — this is expected and fine.
+
+### Stamping new artifacts
+
+When scaffolding a new artifact from a template, the template already contains `**AIDOS Version:** 1.0.0` as a placeholder. Replace it with the current version from `VERSION` before saving. If they happen to match, no change is needed.
+
+---
+
 ## Session Start
 
 Figure out where you are:

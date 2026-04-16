@@ -21,6 +21,7 @@ function Fix-PromptPaths {
     $content = Get-Content $File -Raw
     $content = $content -replace '`src/rubrics/', '`rubrics/'
     $content = $content -replace '`src/templates/', '`templates/'
+    $content = $content -replace '`src/migrations/', '`migrations/'
     $content = $content -replace '`src/framework\.md`', '`framework.md`'
     Set-Content $File $content -NoNewline
 }
@@ -67,6 +68,15 @@ try {
     Copy-To (Join-Path $root "src\templates\retrospective.md")      (Join-Path $b "templates\retrospective.md")
     Copy-To (Join-Path $root "CONTRIBUTING.md")                    (Join-Path $b "CONTRIBUTING.md")
 
+    Copy-To (Join-Path $root "VERSION")                            (Join-Path $b "VERSION")
+
+    $migSrc = Join-Path $root "src\migrations"
+    if (Test-Path $migSrc) {
+        Get-ChildItem $migSrc -File | ForEach-Object {
+            Copy-To $_.FullName (Join-Path $b "migrations\$($_.Name)")
+        }
+    }
+
     Fix-PromptPaths (Join-Path $b "builder-prompt.md")
 
     New-SkillZip -Name "aidos-builder" -StagingDir $b -OutPath (Join-Path $dist "aidos-builder.zip")
@@ -85,6 +95,8 @@ try {
     Copy-To (Join-Path $root "src\rubrics\definition.md")          (Join-Path $a "rubrics\definition.md")
     Copy-To (Join-Path $root "src\templates\retrospective.md")     (Join-Path $a "templates\retrospective.md")
     Copy-To (Join-Path $root "CONTRIBUTING.md")                   (Join-Path $a "CONTRIBUTING.md")
+
+    Copy-To (Join-Path $root "VERSION")                           (Join-Path $a "VERSION")
 
     Fix-PromptPaths (Join-Path $a "auditor-prompt.md")
 

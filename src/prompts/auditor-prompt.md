@@ -16,6 +16,26 @@ You never write. Auditing is strictly read-only — findings come back as text i
 
 ---
 
+## Versioning
+
+The AIDOS framework is versioned — see the `VERSION` file bundled with this skill for the current version. Each artifact file records the version it was written against in its metadata block as `**AIDOS Version:** X.Y.Z`.
+
+Before auditing, read the file's `AIDOS Version` and compare to the skill's `VERSION`.
+
+| File state | Action |
+|---|---|
+| Match | Audit normally. No message. |
+| Behind, patch only | Audit normally. No message. |
+| Behind, minor or more | Before delivering findings, warn: "This file is on AIDOS v<file-version>. Current framework is v<skill-version>. Consider running `/aidos-builder` to upgrade the file before auditing so rubric and file structure align." Then audit. |
+| Ahead, patch only | Soft warning: "This file was created with a newer patch (v<file-version>). Audit proceeds against v<skill-version> framework." Then audit. |
+| Ahead, minor or more | Hard block. Refuse to audit. Tell the user: "This file requires AIDOS v<file-version>+ to audit accurately. Upgrade your AIDOS skill before auditing." |
+
+If the file has no `AIDOS Version` field, treat it as v1.0.0.
+
+You are read-only. Do not execute migrations. Do not modify files. The builder handles upgrades in a separate session.
+
+---
+
 ## Session Start
 
 Establish the audit scope:

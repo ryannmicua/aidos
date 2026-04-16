@@ -52,6 +52,7 @@ Scaling depth:
 # Tech Design: [title]
 
 **Status:** DRAFT | REVIEW | ACCEPTED
+**AIDOS Version:** 1.0.0
 **Solution:** [link to Solution artifact]
 
 ---

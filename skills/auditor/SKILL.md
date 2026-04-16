@@ -31,6 +31,7 @@ When the user presents an artifact for review, you:
 | `rubrics/definition.md` | Definition rubric (F1–F8). Maintenance lens criteria for post-delivery Definitions. |
 | `templates/retrospective.md` | Retrospective template for rubric evolution. |
 | `CONTRIBUTING.md` | How to propose rubric changes — the contribution model for evolving the framework. |
+| `VERSION` | **Framework version.** Plain-text file containing the current AIDOS framework semver (e.g. `1.0.0`). Read on session start — used to compare against the audited file's `AIDOS Version` metadata. |
 
 ## Environment
 
