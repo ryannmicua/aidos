@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_TITLE_ATTEMPTS, suffixedTitle, isDuplicateTitleError } from "./title-conflict.js";
+import { MAX_TITLE_ATTEMPTS, suffixedTitle, isDuplicateTitleError, createWithRetryOnDuplicate } from "./title-conflict.js";
 
 test("MAX_TITLE_ATTEMPTS is 3", () => {
   assert.equal(MAX_TITLE_ATTEMPTS, 3);
@@ -55,4 +55,81 @@ test("isDuplicateTitleError handles non-Error inputs safely", () => {
 test("isDuplicateTitleError is case-insensitive", () => {
   const err = new Error("A PAGE WITH THIS TITLE ALREADY EXISTS");
   assert.equal(isDuplicateTitleError(err), true);
+});
+
+function dupError() {
+  return new Error("A page with this title already exists");
+}
+
+test("createWithRetryOnDuplicate succeeds on first attempt when no conflict", async () => {
+  const attempts = [];
+  const doCreate = async (title) => {
+    attempts.push(title);
+    return { id: "page-1" };
+  };
+  const out = await createWithRetryOnDuplicate("Issues Log", doCreate);
+  assert.deepEqual(attempts, ["Issues Log"]);
+  assert.equal(out.title, "Issues Log");
+  assert.equal(out.renamed, false);
+  assert.deepEqual(out.result, { id: "page-1" });
+});
+
+test("createWithRetryOnDuplicate retries with (1) after one duplicate", async () => {
+  const attempts = [];
+  const doCreate = async (title) => {
+    attempts.push(title);
+    if (title === "Issues Log") throw dupError();
+    return { id: "page-2" };
+  };
+  const out = await createWithRetryOnDuplicate("Issues Log", doCreate);
+  assert.deepEqual(attempts, ["Issues Log", "Issues Log (1)"]);
+  assert.equal(out.title, "Issues Log (1)");
+  assert.equal(out.renamed, true);
+});
+
+test("createWithRetryOnDuplicate retries with (2) after two duplicates", async () => {
+  const attempts = [];
+  const doCreate = async (title) => {
+    attempts.push(title);
+    if (title === "Issues Log" || title === "Issues Log (1)") throw dupError();
+    return { id: "page-3" };
+  };
+  const out = await createWithRetryOnDuplicate("Issues Log", doCreate);
+  assert.deepEqual(attempts, ["Issues Log", "Issues Log (1)", "Issues Log (2)"]);
+  assert.equal(out.title, "Issues Log (2)");
+  assert.equal(out.renamed, true);
+});
+
+test("createWithRetryOnDuplicate hard-fails after three duplicates with rename guidance", async () => {
+  const attempts = [];
+  const doCreate = async (title) => {
+    attempts.push(title);
+    throw dupError();
+  };
+  await assert.rejects(
+    createWithRetryOnDuplicate("Issues Log", doCreate),
+    (err) => {
+      assert.ok(err.message.includes("Issues Log"), "error mentions base title");
+      assert.ok(err.message.includes("3"), "error mentions the attempt cap");
+      assert.ok(
+        err.message.toLowerCase().includes("rename"),
+        "error tells the user to rename the source file",
+      );
+      return true;
+    },
+  );
+  assert.deepEqual(attempts, ["Issues Log", "Issues Log (1)", "Issues Log (2)"]);
+});
+
+test("createWithRetryOnDuplicate bubbles non-duplicate errors without retry", async () => {
+  const attempts = [];
+  const doCreate = async (title) => {
+    attempts.push(title);
+    throw new Error("Confluence API 500: Internal Server Error");
+  };
+  await assert.rejects(
+    createWithRetryOnDuplicate("Issues Log", doCreate),
+    /500/,
+  );
+  assert.deepEqual(attempts, ["Issues Log"]);
 });

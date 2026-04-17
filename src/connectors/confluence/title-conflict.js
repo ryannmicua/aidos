@@ -30,3 +30,33 @@ export function isDuplicateTitleError(err) {
     msg.includes("a page already exists with the same title")
   );
 }
+
+/**
+ * Attempt to create a page, retrying with numeric suffixes when Confluence
+ * rejects the title as a duplicate within the space. Caps at MAX_TITLE_ATTEMPTS
+ * total attempts — the last failure becomes a hard error that tells the user
+ * to rename the source file, so duplicates are resolved at the source rather
+ * than accumulating.
+ *
+ * @param {string} baseTitle  The desired title.
+ * @param {(title: string) => Promise<object>} doCreate  Caller's create impl.
+ * @returns {Promise<{ result: object, title: string, renamed: boolean }>}
+ */
+export async function createWithRetryOnDuplicate(baseTitle, doCreate) {
+  for (let attempt = 0; attempt < MAX_TITLE_ATTEMPTS; attempt++) {
+    const title = suffixedTitle(baseTitle, attempt);
+    try {
+      const result = await doCreate(title);
+      return { result, title, renamed: attempt > 0 };
+    } catch (err) {
+      if (!isDuplicateTitleError(err)) throw err;
+      if (attempt === MAX_TITLE_ATTEMPTS - 1) {
+        throw new Error(
+          `Cannot publish "${baseTitle}" to Confluence: ${MAX_TITLE_ATTEMPTS} pages with this title already exist in the target space. ` +
+            `AIDOS requires unique filenames within a Confluence space. ` +
+            `Rename the source file (or the conflicting Confluence pages) and re-run the publish.`,
+        );
+      }
+    }
+  }
+}
