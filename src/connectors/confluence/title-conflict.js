@@ -15,3 +15,18 @@ export const MAX_TITLE_ATTEMPTS = 3;
 export function suffixedTitle(baseTitle, attempt) {
   return attempt === 0 ? baseTitle : `${baseTitle} (${attempt})`;
 }
+
+/**
+ * Detect the Confluence "duplicate title in space" 400 error by matching the
+ * two known server phrasings. Safe on non-Error inputs.
+ */
+export function isDuplicateTitleError(err) {
+  if (!err || typeof err !== "object" || typeof err.message !== "string") {
+    return false;
+  }
+  const msg = err.message;
+  return (
+    msg.includes("A page with this title already exists") ||
+    msg.includes("A page already exists with the same TITLE")
+  );
+}
