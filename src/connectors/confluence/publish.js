@@ -254,15 +254,75 @@ async function setStoredHash(baseUrl, pageId, hash) {
 // Markdown parsing
 // ---------------------------------------------------------------------------
 
+// Supports two metadata formats (bold wins if both are present):
+//   1. **Status:** ACCEPTED         — inline bold fields, can appear anywhere
+//   2. A leading markdown table right after the H1:
+//        | Status | ACCEPTED |
+//        | --- | --- |
+//        | Owner | Simon |
 function parseMetadata(markdown) {
   const meta = {};
   const fields = { status: "Status", owner: "Owner" };
+
+  // Format 1: inline **Key:** Value — takes precedence.
   for (const [key, label] of Object.entries(fields)) {
     const match = markdown.match(
       new RegExp(`\\*\\*${label}:\\*\\*\\s*(.+)`, "i"),
     );
     if (match) meta[key] = match[1].trim();
   }
+
+  // Format 2: leading table, only if a field was not found in bold format.
+  if (!meta.status || !meta.owner) {
+    const fromTable = parseLeadingMetadataTable(markdown);
+    for (const key of Object.keys(fields)) {
+      if (!meta[key] && fromTable[key]) meta[key] = fromTable[key];
+    }
+  }
+
+  return meta;
+}
+
+// Extract status/owner from a leading markdown table. Returns {} if the
+// document does not start with a table (after optional blank lines and H1).
+// Only the first table is considered.
+function parseLeadingMetadataTable(markdown) {
+  const lines = markdown.split("\n");
+  let i = 0;
+
+  // Skip leading blank lines
+  while (i < lines.length && lines[i].trim() === "") i++;
+
+  // Optional H1
+  if (i < lines.length && lines[i].startsWith("# ")) {
+    i++;
+    while (i < lines.length && lines[i].trim() === "") i++;
+  }
+
+  // Must be followed by a table row
+  if (i >= lines.length || !/^\|.*\|\s*$/.test(lines[i])) return {};
+
+  // Consume contiguous table rows
+  const rows = [];
+  while (i < lines.length && /^\|.*\|\s*$/.test(lines[i])) {
+    rows.push(lines[i]);
+    i++;
+  }
+
+  const meta = {};
+  const keyMap = { status: "status", owner: "owner" };
+  for (const row of rows) {
+    // Skip the separator row (only dashes/colons/pipes/whitespace)
+    if (/^\|[\s\-:|]+\|\s*$/.test(row)) continue;
+
+    const cells = row.split("|").slice(1, -1).map((c) => c.trim());
+    if (cells.length < 2) continue;
+
+    const key = cells[0].toLowerCase();
+    const value = cells[1];
+    if (keyMap[key] && !meta[key]) meta[key] = value;
+  }
+
   return meta;
 }
 
@@ -377,7 +437,11 @@ marked.use({
 // Page body assembly
 // ---------------------------------------------------------------------------
 
-/** Strip the header block that the connector already surfaces in Page Properties. */
+/**
+ * Strip the header block that the connector already surfaces in Page Properties.
+ * Handles both supported metadata formats: **Key:** Value lines and a leading
+ * markdown table.
+ */
 function stripHeader(markdown) {
   const lines = markdown.split("\n");
   let i = 0;
@@ -388,11 +452,16 @@ function stripHeader(markdown) {
   // Skip the first H1 heading
   if (i < lines.length && lines[i].startsWith("# ")) i++;
 
-  // Skip blank lines and **Key:** Value metadata lines
+  // Skip blank lines, **Key:** Value metadata lines, and a leading metadata table
   while (i < lines.length) {
     const line = lines[i].trim();
     if (line === "") { i++; continue; }
     if (/^\*\*\w[\w\s]*:\*\*/.test(line)) { i++; continue; }
+    // Leading metadata table: consume contiguous `|...|` rows (header, separator, data)
+    if (/^\|.*\|\s*$/.test(line)) {
+      while (i < lines.length && /^\|.*\|\s*$/.test(lines[i])) i++;
+      continue;
+    }
     break;
   }
 
