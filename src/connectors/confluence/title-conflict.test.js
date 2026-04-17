@@ -110,7 +110,10 @@ test("createWithRetryOnDuplicate hard-fails after three duplicates with rename g
     createWithRetryOnDuplicate("Issues Log", doCreate),
     (err) => {
       assert.ok(err.message.includes("Issues Log"), "error mentions base title");
-      assert.ok(err.message.includes("3"), "error mentions the attempt cap");
+      assert.ok(
+        err.message.includes("Issues Log (1)") && err.message.includes("Issues Log (2)"),
+        "error lists the suffixed titles that were tried",
+      );
       assert.ok(
         err.message.toLowerCase().includes("rename"),
         "error tells the user to rename the source file",

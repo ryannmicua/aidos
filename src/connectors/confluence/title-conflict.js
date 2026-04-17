@@ -52,8 +52,8 @@ export async function createWithRetryOnDuplicate(baseTitle, doCreate) {
       if (!isDuplicateTitleError(err)) throw err;
       if (attempt === MAX_TITLE_ATTEMPTS - 1) {
         throw new Error(
-          `Cannot publish "${baseTitle}" to Confluence: ${MAX_TITLE_ATTEMPTS} pages with this title already exist in the target space. ` +
-            `AIDOS requires unique filenames within a Confluence space. ` +
+          `Cannot publish "${baseTitle}" to Confluence: the titles "${baseTitle}", "${baseTitle} (1)", and "${baseTitle} (2)" are all taken in the target space. ` +
+            `Confluence requires page titles to be unique within a space. ` +
             `Rename the source file (or the conflicting Confluence pages) and re-run the publish.`,
         );
       }

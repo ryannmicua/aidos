@@ -563,7 +563,7 @@ async function publishPage(ctx, parentId, childPages, title, body, labels) {
       createdTitle,
     );
     console.log(
-      "WARNING: Rename the source file so titles are unique in the Confluence space — AIDOS requires unique filenames.",
+      "WARNING: Rename the source file to give it a unique Confluence page title — Confluence requires page titles to be unique within a space.",
     );
   }
   await updatePage(baseUrl, created.id, createdTitle, body, 1);
