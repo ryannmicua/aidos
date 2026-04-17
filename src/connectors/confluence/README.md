@@ -171,6 +171,14 @@ If your Confluence space has existing pages with common names, add a `titleTempl
 | `(CW) %title%` | (CW) Problem |
 | `CW.Core - %title%` | CW.Core - Problem |
 
+### Duplicate titles
+
+Confluence requires page titles to be **unique within a space**. If an AIDOS artifact's derived title collides with an existing page elsewhere in the target space (not under the AIDOS root), the connector renames the new page by appending a numeric suffix: `Title`, then `Title (1)`, then `Title (2)`.
+
+The connector caps this at **3 total attempts** and hard-fails when all attempts are exhausted. Each rename logs two `WARNING:` lines in the publish output — one naming the collision, one explaining how to resolve it. If you see these warnings, rename the source file (or the conflicting Confluence pages) so titles are unique — the cap exists specifically to force the issue to be resolved rather than silently accumulating duplicates.
+
+On re-publish the connector checks the same suffix ladder, so previously-renamed pages are updated in place rather than creating a new copy each run.
+
 ### Multiple publish targets
 
 To add more targets later, add another key under `publish`:
@@ -222,7 +230,7 @@ cd aidos/src/connectors/confluence
 npm install
 ```
 
-Only one dependency (`marked` for markdown parsing). No test suite — the connector has been production-tested by running against real Confluence spaces.
+Only one dependency (`marked` for markdown parsing). Run `npm test` from this directory to execute the unit test suite (Node's built-in `node --test` runner, no external deps).
 
 ### Local dry-run
 
@@ -258,12 +266,14 @@ Use this only when you need to debug publish behaviour outside CI — the canoni
 ```
 src/connectors/confluence/
 ├── publish.js              ← Single entry point — walks .aidos/, converts markdown, publishes
+├── title-conflict.js       ← Pure helpers for duplicate-title detection and suffix resolution
+├── title-conflict.test.js  ← Unit tests for title-conflict helpers (node --test)
 ├── manifest.schema.json    ← JSON Schema for .aidos/manifest.json
 ├── package.json            ← { "type": "module", dependencies: { "marked": "..." } }
 └── README.md               ← This file
 ```
 
-The script is ~700 lines, self-contained, ESM, uses Node 20+ built-in fetch. Follow the structure (constants → auth → API helpers → markdown transforms → publish logic → main).
+The connector is ESM, uses Node 20+ built-in fetch, and has two modules: `publish.js` (the orchestration script) and `title-conflict.js` (pure helpers for duplicate-title handling). Follow the structure (constants → auth → API helpers → markdown transforms → publish logic → main).
 
 ### Versioning
 

@@ -4,6 +4,10 @@ import { createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { marked } from "marked";
+import {
+  createWithRetryOnDuplicate,
+  findOwnedPageByTitle,
+} from "./title-conflict.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -506,38 +510,66 @@ async function publishPage(ctx, parentId, childPages, title, body, labels) {
     return existing ?? `dry-run-${title}`;
   }
 
-  // Check children of parent first, then search descendants of root as fallback
+  // Check direct children first (fast path), then search descendants of root
+  // with suffix tolerance so re-publishes find previously-renamed pages.
   let pageId = childPages.get(title);
+  let actualTitle = title;
   if (!pageId) {
-    const found = await findPageByTitle(baseUrl, ctx.rootPageId, title);
-    if (found) pageId = found.id;
+    const found = await findOwnedPageByTitle(title, (candidate) =>
+      findPageByTitle(baseUrl, ctx.rootPageId, candidate),
+    );
+    if (found) {
+      pageId = found.id;
+      actualTitle = found.title;
+    }
   }
 
   if (pageId) {
     // Check if content has changed via stored hash
     const storedHash = await getStoredHash(baseUrl, pageId);
     if (storedHash === hash) {
-      console.log("  Unchanged: %s (page %s)", title, pageId);
+      console.log("  Unchanged: %s (page %s)", actualTitle, pageId);
       ctx.stats.unchanged++;
       return pageId;
     }
 
     const page = await getPage(baseUrl, pageId);
-    await updatePage(baseUrl, pageId, title, body, page.version);
+    await updatePage(baseUrl, pageId, actualTitle, body, page.version);
     await addLabels(baseUrl, pageId, labels);
     await setStoredHash(baseUrl, pageId, hash);
-    console.log("  Updated: %s (page %s, v%d → v%d)", title, pageId, page.version, page.version + 1);
+    console.log(
+      "  Updated: %s (page %s, v%d → v%d)",
+      actualTitle,
+      pageId,
+      page.version,
+      page.version + 1,
+    );
     ctx.stats.updated++;
     return pageId;
   }
 
   // Two-step create: minimal body first (avoids Fabric editor macro
   // restrictions), then immediately update with full storage format.
-  const created = await createPage(baseUrl, spaceKey, parentId, title, "<p></p>");
-  await updatePage(baseUrl, created.id, title, body, 1);
+  // Confluence requires per-space title uniqueness — retry with numeric
+  // suffixes on duplicate-title 400s (capped in createWithRetryOnDuplicate).
+  const { result: created, title: createdTitle, renamed } =
+    await createWithRetryOnDuplicate(title, (candidate) =>
+      createPage(baseUrl, spaceKey, parentId, candidate, "<p></p>"),
+    );
+  if (renamed) {
+    console.log(
+      'WARNING: A page titled "%s" already exists elsewhere in this Confluence space. Created as "%s" instead.',
+      title,
+      createdTitle,
+    );
+    console.log(
+      "WARNING: Rename the source file to give it a unique Confluence page title — Confluence requires page titles to be unique within a space.",
+    );
+  }
+  await updatePage(baseUrl, created.id, createdTitle, body, 1);
   await addLabels(baseUrl, created.id, labels);
   await setStoredHash(baseUrl, created.id, hash);
-  console.log("  Created: %s (page %s)", title, created.id);
+  console.log("  Created: %s (page %s)", createdTitle, created.id);
   ctx.stats.created++;
   return created.id;
 }
