@@ -1,12 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MAX_TITLE_ATTEMPTS } from "./title-conflict.js";
+import { MAX_TITLE_ATTEMPTS, suffixedTitle } from "./title-conflict.js";
 
 test("MAX_TITLE_ATTEMPTS is 3", () => {
   assert.equal(MAX_TITLE_ATTEMPTS, 3);
 });
-
-import { suffixedTitle } from "./title-conflict.js";
 
 test("suffixedTitle returns the plain title on attempt 0", () => {
   assert.equal(suffixedTitle("Issues Log", 0), "Issues Log");
