@@ -259,6 +259,31 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
     }),
   );
 
+  // Ensure staging branches exist for any folder with strategy: "staged".
+  // Staging-vs-default sync is the aidos-staging.yml workflow's job — not re-done here.
+  const stagingBranchesEnsured = new Set();
+  for (const folder of aidosFolders) {
+    if (folder.write?.strategy === "staged") {
+      const stagingBranchName = folder.write.staging_branch || "aidos";
+      if (stagingBranchesEnsured.has(stagingBranchName)) continue;
+      stagingBranchesEnsured.add(stagingBranchName);
+      try {
+        await client.getBranch(owner, repo, stagingBranchName);
+      } catch (err) {
+        if (/404/.test(err.message)) {
+          try {
+            const base = await client.getBranch(owner, repo, defaultBranch);
+            await client.createBranch(owner, repo, stagingBranchName, base.commit.sha);
+          } catch (createErr) {
+            console.error(`Failed to create staging branch ${stagingBranchName}: ${createErr.message}`);
+          }
+        } else {
+          console.error(`Staging branch probe failed for ${stagingBranchName}: ${err.message}`);
+        }
+      }
+    }
+  }
+
   let publishStatus = null;
   try {
     const workflows = await client.listWorkflows(owner, repo);
