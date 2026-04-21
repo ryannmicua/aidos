@@ -87,7 +87,7 @@ If the file already has other MCP servers, add `aidos-github` alongside them ins
 
 1. Quit Claude Desktop completely and reopen it
 2. Start a new chat
-3. The 6 AIDOS tools should be available: `open_workspace`, `read_artifacts`, `save`, `diff`, `publish`, `resolve`
+3. The 7 AIDOS tools should be available: `open_workspace`, `read_artifacts`, `save`, `edit`, `diff`, `publish`, `resolve`
 4. Ask Claude: *"Open the AIDOS workspace for `<your-org>/<your-repo>`"*
 5. The first call triggers GitHub device flow:
    - Claude shows: *"Go to https://github.com/login/device and enter code XXXX-XXXX"*
@@ -197,7 +197,7 @@ Each `.aidos/` folder in a repo needs a `manifest.json`. Add a `write` section t
 | `strategy` | `"pr"` | `"pr"` for pull request, `"push"` for direct merge, `"staged"` for merge to a persistent staging branch with a rolling PR to `target` |
 | `target` | repo default | Final target branch. For `pr`/`push`: branch to PR/merge into. For `staged`: base of the rolling PR from the staging branch |
 | `staging_branch` | `"aidos"` | *(staged only)* Persistent branch between working branches and `target`. The rolling PR is opened from this branch to `target` by the shipped workflow |
-| `reviewers` | `[]` | GitHub users (`alice`) or teams (`@org/team-name`) for PR review. For `staged`, requested once on the rolling PR |
+| `reviewers` | `[]` | GitHub users (`alice`) or teams (`@org/team-name`) for PR review. *(staged mode: the shipped workflow does not request reviewers — use CODEOWNERS or branch-protection required reviewers instead.)* |
 
 ### Choosing a strategy
 
@@ -247,7 +247,7 @@ npm install
 npm test
 ```
 
-130 tests across 26 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
+145 tests across 30 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
 
 ### Project structure
 

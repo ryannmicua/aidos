@@ -852,7 +852,7 @@ server.registerTool(
       branch: z.string().describe("Working branch to publish"),
       target: z.string().describe("Target branch (e.g. main)"),
       strategy: z.enum(["pr", "push", "staged"]).describe("Publication strategy: pr, push, or staged"),
-      reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs)"),
+      reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs). Ignored under strategy: 'staged' — reviewers apply to the rolling PR (use CODEOWNERS or branch protection)"),
       title: z.string().optional().describe("PR title (pr strategy only)"),
       body: z.string().optional().describe("PR body (pr strategy only)"),
       confirm: z.boolean().default(false).describe("Set true to execute after reviewing preflight"),
@@ -906,7 +906,7 @@ server.registerTool(
       branch: z.string().describe("Working branch"),
       target: z.string().describe("Target branch (e.g. main)"),
       strategy: z.enum(["pr", "push", "staged"]).describe("Publication strategy: pr, push, or staged"),
-      reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs)"),
+      reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs). Ignored under strategy: 'staged' — reviewers apply to the rolling PR (use CODEOWNERS or branch protection)"),
       title: z.string().optional(),
       body: z.string().optional(),
       merges: z.array(
