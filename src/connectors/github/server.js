@@ -273,17 +273,17 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
     }),
   );
 
-  // Probe once: is aidos-staging.yml installed?
-  let stagingWorkflowPresent = false;
+  // Probe once: fetch all workflows and derive (a) staging-workflow presence (b) publish-status candidate
+  let wfList = [];
   try {
     const wfs = await client.listWorkflows(owner, repo);
-    const wfList = wfs.workflows || [];
-    stagingWorkflowPresent = wfList.some((w) =>
-      /aidos-staging/i.test(w.path || "") || /aidos[-_ ]*staging/i.test(w.name || "")
-    );
+    wfList = wfs.workflows || [];
   } catch (err) {
     console.error(`Workflow probe failed: ${err.message}`);
   }
+  const stagingWorkflowPresent = wfList.some((w) =>
+    /aidos-staging/i.test(w.path || "") || /aidos[-_ ]*staging/i.test(w.name || "")
+  );
 
   // Ensure staging branches exist and look up rolling PR + workflow state for every folder.
   const stagingBranchesEnsured = new Set();
@@ -332,11 +332,13 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
 
   let publishStatus = null;
   try {
-    const workflows = await client.listWorkflows(owner, repo);
-    const wfList = workflows.workflows || [];
-    const candidate = wfList.find((w) =>
-      /aidos|confluence|publish/i.test(w.name || "") || /aidos|confluence|publish/i.test(w.path || "")
-    );
+    // Exclude aidos-staging.yml — that's the rolling-PR maintainer, not a publish workflow.
+    const candidate = wfList.find((w) => {
+      const path = w.path || "";
+      const name = w.name || "";
+      if (/aidos-staging/i.test(path)) return false;
+      return /confluence|publish/i.test(name) || /confluence|publish/i.test(path);
+    });
     if (candidate) {
       const runs = await client.listWorkflowRuns(owner, repo, candidate.id);
       const latest = (runs.workflow_runs || [])[0];
