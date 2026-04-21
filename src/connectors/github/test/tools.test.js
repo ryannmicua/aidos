@@ -25,6 +25,7 @@ function mockClient(overrides = {}) {
     compare: async () => ({ ahead_by: 0, files: [] }),
     listWorkflows: async () => ({ workflows: [] }),
     listWorkflowRuns: async () => ({ workflow_runs: [] }),
+    listPulls: async () => [],
   };
   return { ...defaults, ...overrides };
 }

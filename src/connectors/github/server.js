@@ -64,8 +64,19 @@ export function renderManifestStatus(folder) {
     return lines.join("\n");
   }
   const w = folder.write || {};
-  if (w.strategy) lines.push(`  ✓ write.strategy: ${w.strategy} (PRs will target ${w.target})`);
-  else lines.push("  ⚠ No write config — Publish will default to PR against main.");
+  if (w.strategy === "staged") {
+    const stagingName = w.staging_branch || "aidos";
+    lines.push(`  ✓ write.strategy: staged (staging: ${stagingName} → ${w.target})`);
+    if (folder.rolling_pr) {
+      lines.push(`  ✓ rolling PR #${folder.rolling_pr.number} (${folder.rolling_pr.state}): ${folder.rolling_pr.url}`);
+    } else {
+      lines.push("  • no rolling PR yet — it will open on the first publish");
+    }
+  } else if (w.strategy) {
+    lines.push(`  ✓ write.strategy: ${w.strategy} (PRs will target ${w.target})`);
+  } else {
+    lines.push("  ⚠ No write config — Publish will default to PR against main.");
+  }
   if (w.reviewers && w.reviewers.length) lines.push(`  ✓ write.reviewers: ${w.reviewers.join(", ")}`);
   if (folder.publish_configured) {
     lines.push("  ✓ publish.confluence configured");
@@ -259,13 +270,17 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
     }),
   );
 
-  // Ensure staging branches exist for any folder with strategy: "staged".
-  // Staging-vs-default sync is the aidos-staging.yml workflow's job — not re-done here.
+  // Ensure staging branches exist and look up rolling PR for any folder with strategy: "staged".
   const stagingBranchesEnsured = new Set();
   for (const folder of aidosFolders) {
-    if (folder.write?.strategy === "staged") {
-      const stagingBranchName = folder.write.staging_branch || "aidos";
-      if (stagingBranchesEnsured.has(stagingBranchName)) continue;
+    if (folder.write?.strategy !== "staged") {
+      folder.rolling_pr = null;
+      continue;
+    }
+    const stagingBranchName = folder.write.staging_branch || "aidos";
+    const targetBranchName = folder.write.target || defaultBranch;
+
+    if (!stagingBranchesEnsured.has(stagingBranchName)) {
       stagingBranchesEnsured.add(stagingBranchName);
       try {
         await client.getBranch(owner, repo, stagingBranchName);
@@ -281,6 +296,21 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
           console.error(`Staging branch probe failed for ${stagingBranchName}: ${err.message}`);
         }
       }
+    }
+
+    try {
+      const prs = await client.listPulls(owner, repo, {
+        state: "open",
+        head: `${owner}:${stagingBranchName}`,
+        base: targetBranchName,
+      });
+      const pr = (prs || [])[0];
+      folder.rolling_pr = pr
+        ? { number: pr.number, url: pr.html_url, state: pr.state }
+        : null;
+    } catch (err) {
+      console.error(`Rolling PR lookup failed for ${stagingBranchName}: ${err.message}`);
+      folder.rolling_pr = null;
     }
   }
 

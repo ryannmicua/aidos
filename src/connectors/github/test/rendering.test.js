@@ -126,3 +126,42 @@ describe("renderWorkspaceStatus", () => {
     assert.match(out, /start fresh/);
   });
 });
+
+describe("renderManifestStatus — staged strategy", () => {
+  it("shows rolling PR URL and state when present", () => {
+    const folder = {
+      manifest_present: true,
+      manifest_errors: [],
+      write: { strategy: "staged", target: "main", staging_branch: "aidos" },
+      publish_configured: true,
+      rolling_pr: { number: 42, url: "https://github.com/org/repo/pull/42", state: "open" },
+    };
+    const output = renderManifestStatus(folder);
+    assert.match(output, /write\.strategy: staged/);
+    assert.match(output, /rolling PR #42/);
+    assert.match(output, /https:\/\/github\.com\/org\/repo\/pull\/42/);
+  });
+
+  it("notes no rolling PR when none exists yet", () => {
+    const folder = {
+      manifest_present: true,
+      manifest_errors: [],
+      write: { strategy: "staged", target: "main", staging_branch: "aidos" },
+      publish_configured: true,
+      rolling_pr: null,
+    };
+    const output = renderManifestStatus(folder);
+    assert.match(output, /no rolling PR yet/i);
+  });
+
+  it("renders staging_branch in the strategy line", () => {
+    const folder = {
+      manifest_present: true,
+      manifest_errors: [],
+      write: { strategy: "staged", target: "main", staging_branch: "docs-staging" },
+      publish_configured: false,
+    };
+    const output = renderManifestStatus(folder);
+    assert.match(output, /staging: docs-staging → main/);
+  });
+});
