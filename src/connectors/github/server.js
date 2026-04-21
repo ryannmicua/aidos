@@ -773,12 +773,12 @@ server.registerTool(
   {
     title: "Publish AIDOS Changes",
     description:
-      "Preflight and publish working branch changes via pull request (pr) or direct merge (push). If main has diverged and the merge would conflict, returns a structured conflict packet with base/theirs/yours content per file — follow up with the resolve tool after walking the user through the conflicts. Set confirm=true to execute after reviewing the preflight.",
+      "Preflight and publish working branch changes. Strategy options: 'pr' (open a pull request to target), 'push' (direct merge into target), or 'staged' (merge into a persistent staging branch that has a rolling PR to the final target — the AI skill reads the manifest and passes target=staging_branch in this mode). If the target branch has diverged and the merge would conflict, returns a structured conflict packet with base/theirs/yours content per file — follow up with the resolve tool after walking the user through the conflicts. Set confirm=true to execute after reviewing the preflight.",
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
       branch: z.string().describe("Working branch to publish"),
       target: z.string().describe("Target branch (e.g. main)"),
-      strategy: z.enum(["pr", "push"]).describe("Publication strategy: pr or push"),
+      strategy: z.enum(["pr", "push", "staged"]).describe("Publication strategy: pr or push"),
       reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs)"),
       title: z.string().optional().describe("PR title (pr strategy only)"),
       body: z.string().optional().describe("PR body (pr strategy only)"),
@@ -827,12 +827,12 @@ server.registerTool(
   {
     title: "Resolve AIDOS Publish Conflicts",
     description:
-      "Apply conflict resolutions returned by publish(). Takes an array of merge packets, each with the original base/theirs/yours echoed back verbatim from publish's response and the user's resolved content. Validates staleness (rejects if main's content for a conflicting file changed since the packet was issued), checks for newly-conflicting paths not in the incoming merges, and on success commits a two-parent merge commit and opens the PR. If main drifted or a new conflict appeared, returns a fresh conflict packet — present the new state to the user and call resolve again with updated resolutions.",
+      "Apply conflict resolutions returned by publish(). Takes an array of merge packets, each with the original base/theirs/yours echoed back verbatim from publish's response and the user's resolved content. Validates staleness (rejects if the target's content for a conflicting file changed since the packet was issued), checks for newly-conflicting paths not in the incoming merges, and on success commits a two-parent merge commit and performs the publish action (pr, push, or staged). If the target drifted or a new conflict appeared, returns a fresh conflict packet — present the new state to the user and call resolve again with updated resolutions.",
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
       branch: z.string().describe("Working branch"),
       target: z.string().describe("Target branch (e.g. main)"),
-      strategy: z.enum(["pr", "push"]).describe("pr or push"),
+      strategy: z.enum(["pr", "push", "staged"]).describe("pr or push"),
       reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs)"),
       title: z.string().optional(),
       body: z.string().optional(),
