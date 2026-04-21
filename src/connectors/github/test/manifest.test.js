@@ -37,4 +37,26 @@ describe("validateManifest", () => {
     const result = validateManifest({});
     assert.equal(result.valid, true);
   });
+
+  it("accepts staged strategy with staging_branch", () => {
+    const result = validateManifest({
+      write: { strategy: "staged", target: "main", staging_branch: "aidos", reviewers: ["@team"] },
+    });
+    assert.equal(result.valid, true);
+    assert.deepEqual(result.errors, []);
+  });
+
+  it("accepts staged strategy without staging_branch (default applies at runtime)", () => {
+    const result = validateManifest({
+      write: { strategy: "staged", target: "main" },
+    });
+    assert.equal(result.valid, true);
+  });
+
+  it("rejects non-string staging_branch", () => {
+    const result = validateManifest({
+      write: { strategy: "staged", staging_branch: 42 },
+    });
+    assert.equal(result.valid, false);
+  });
 });

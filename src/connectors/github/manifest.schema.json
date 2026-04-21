@@ -11,13 +11,17 @@
       "properties": {
         "strategy": {
           "type": "string",
-          "enum": ["pr", "push"],
+          "enum": ["pr", "push", "staged"],
           "default": "pr",
-          "description": "How changes integrate: 'pr' opens a pull request, 'push' merges directly"
+          "description": "How changes integrate: 'pr' opens a pull request, 'push' merges directly, 'staged' merges into a persistent staging branch that has a rolling PR to target"
         },
         "target": {
           "type": "string",
-          "description": "Branch to create from and merge/PR into (default: repo default branch)"
+          "description": "Final target branch. For 'pr'/'push' this is where changes land; for 'staged' this is the base of the rolling PR from the staging branch"
+        },
+        "staging_branch": {
+          "type": "string",
+          "description": "Persistent staging branch between working branches and target. Only consulted when strategy is 'staged'. Default: 'aidos'"
         },
         "reviewers": {
           "type": "array",
