@@ -36,6 +36,8 @@ Each artifact is checked against its own quality rubric **and** against the arti
 
 **Builder/auditor separation.** AIDOS depends on separation between artifact creation and artifact audit. One person sprints ahead with AI to create the artifact. A different person checks it against the rubrics and the preceding artifact. The same person can't be both builder and final judge. That's the governance.
 
+> Browse the framework interactively at [shobman.github.io/aidos](https://shobman.github.io/aidos/) — the Framework Explorer renders the full rubrics and templates as a navigable site.
+
 ---
 
 ## How It Changes the Way You Work
@@ -127,10 +129,7 @@ CONTRIBUTING.md                   ← How to propose rubric changes
 docs/
 ├── manifesto.md                  ← The philosophy — why decision quality matters
 ├── worked-example.md             ← Full walkthrough — the human–AI workflow in action
-├── maturity-model.md             ← Agent autonomy spectrum — how the quality model scales
-└── images/
-    ├── aidos.jpg                 ← Hero image
-    └── social.jpg                ← Social sharing image (1280×640)
+└── maturity-model.md             ← Agent autonomy spectrum — how the quality model scales
 src/
 ├── framework.md                  ← The full operating model — start here
 ├── rubrics/
@@ -159,10 +158,6 @@ skills/
 └── build.ps1                     ← Assembles and ZIPs skills for distribution
 site/                             ← Framework Explorer (GitHub Pages)
 ```
-
-The Framework Explorer is hosted at [shobman.github.io/aidos](https://shobman.github.io/aidos/). To run locally: `cd site && npm install && npm run dev`.
-
-Designed to work with any AI tool that supports system prompts or persistent instructions.
 
 ---
 
