@@ -132,7 +132,7 @@ describe("renderManifestStatus — staged strategy", () => {
     const folder = {
       manifest_present: true,
       manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "aidos" },
+      write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" },
       publish_configured: true,
       rolling_pr: { number: 42, url: "https://github.com/org/repo/pull/42", state: "open" },
     };
@@ -146,7 +146,7 @@ describe("renderManifestStatus — staged strategy", () => {
     const folder = {
       manifest_present: true,
       manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "aidos" },
+      write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" },
       publish_configured: true,
       rolling_pr: null,
     };
@@ -171,7 +171,7 @@ describe("renderManifestStatus — aidos-staging workflow warning", () => {
     const folder = {
       manifest_present: true,
       manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "aidos" },
+      write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" },
       publish_configured: true,
       rolling_pr: null,
       staging_workflow_present: false,
@@ -184,7 +184,7 @@ describe("renderManifestStatus — aidos-staging workflow warning", () => {
     const folder = {
       manifest_present: true,
       manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "aidos" },
+      write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" },
       publish_configured: true,
       rolling_pr: null,
       staging_workflow_present: true,

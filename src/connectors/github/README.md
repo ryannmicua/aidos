@@ -128,7 +128,7 @@ publish()                 → runs pre-flight, opens PR on clean sync,
 resolve(merges)           → echoes the packet back with user's resolutions,
                             commits the merge, opens the PR
 --- strategy: "staged" (alternate publish ending) ---
-publish()                 → merges working branch → staging_branch (e.g. aidos),
+publish()                 → merges working branch → staging_branch (e.g. aidos/staged),
                             deletes working branch. Shipped workflow maintains
                             a rolling PR staging_branch → target.
 ```
@@ -196,7 +196,7 @@ Each `.aidos/` folder in a repo needs a `manifest.json`. Add a `write` section t
 |-------|---------|-------------|
 | `strategy` | `"pr"` | `"pr"` for pull request, `"push"` for direct merge, `"staged"` for merge to a persistent staging branch with a rolling PR to `target` |
 | `target` | repo default | Final target branch. For `pr`/`push`: branch to PR/merge into. For `staged`: base of the rolling PR from the staging branch |
-| `staging_branch` | `"aidos"` | *(staged only)* Persistent branch between working branches and `target`. The rolling PR is opened from this branch to `target` by the shipped workflow |
+| `staging_branch` | `"aidos/staged"` | *(staged only)* Persistent branch between working branches and `target`. The rolling PR is opened from this branch to `target` by the shipped workflow. Default lives inside the `aidos/*` namespace (same as user working branches) to avoid a Git-ref collision that a bare `aidos` name would cause |
 | `reviewers` | `[]` | GitHub users (`alice`) or teams (`@org/team-name`) for PR review. *(staged mode: the shipped workflow does not request reviewers — use CODEOWNERS or branch-protection required reviewers instead.)* |
 
 ### Choosing a strategy
@@ -217,13 +217,15 @@ Each user gets one `aidos/{github-username}` branch per repo. The branch is crea
 
 ### Staging branch model (strategy: `staged`)
 
-Under `staged`, the `staging_branch` (default `aidos`) is a persistent branch that sits slightly ahead of `target`. It's the socialisation surface: non-coders publish here, Confluence publishing fires from here, stakeholders read here.
+Under `staged`, the `staging_branch` (default `aidos/staged`) is a persistent branch that sits slightly ahead of `target`. It's the socialisation surface: non-coders publish here, Confluence publishing fires from here, stakeholders read here.
 
 Merging the rolling PR `staging_branch → target` is the **engineering commitment signal**: "we're picking this up to build it." Until that merge happens, docs evolve freely on `staging_branch` without disturbing `target`.
 
 Requires the `aidos-staging.yml` workflow installed in `.github/workflows/` to maintain the rolling PR and reset `staging_branch` after each merge. If the workflow isn't installed, publishes still succeed to `staging_branch`, but no rolling PR is opened — the workspace dashboard warns when this is the case.
 
-**Install the workflow:** copy `src/connectors/github/workflows/aidos-staging.yml` into `.github/workflows/` in the target repo. If you changed `staging_branch` or `target` from the defaults (`aidos` / `main`), edit the `env:` block at the top of the copied file to match.
+**Install the workflow:** copy `src/connectors/github/workflows/aidos-staging.yml` into `.github/workflows/` in the target repo. If you changed `staging_branch` or `target` from the defaults (`aidos/staged` / `main`), edit the `env:` block AND the branch filters in `on:` at the top of the copied file to match.
+
+**Why `aidos/staged`, not bare `aidos`?** A branch literally named `aidos` can't coexist with branches under `aidos/*` in Git's ref hierarchy — creating one blocks the other. Nesting the staging branch inside the same namespace as user working branches (`aidos/alice`, `aidos/bob`, `aidos/staged`) sidesteps the collision cleanly.
 
 **Confluence under staged.** If you're using the Confluence publish connector, retarget its trigger branch in `.github/workflows/<confluence-workflow>.yml` from your `target` branch to your `staging_branch`. That way Confluence publishes fire when non-coders push to the staging branch — which is exactly the point: publish-for-socialisation happens without waiting for engineering commitment.
 

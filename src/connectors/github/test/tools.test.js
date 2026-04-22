@@ -690,13 +690,13 @@ describe("publishChanges — staged strategy", () => {
 
     const result = await publishChanges(client, "org", "repo", "aidos/simon", {
       strategy: "staged",
-      target: "aidos",
+      target: "aidos/staged",
     });
 
     assert.equal(result.type, "staged");
     assert.equal(result.merge_sha, "merge-abc");
     assert.equal(result.branch_deleted, true);
-    assert.equal(mergedInto, "aidos");
+    assert.equal(mergedInto, "aidos/staged");
     assert.equal(mergedFrom, "aidos/simon");
     assert.equal(deletedBranch, "aidos/simon");
     assert.equal(createPullCalled, false, "staged strategy must not open a PR — workflow owns that");
@@ -715,7 +715,7 @@ describe("publishChanges — staged strategy", () => {
 
     const result = await publishChanges(client, "org", "repo", "aidos/simon", {
       strategy: "staged",
-      target: "aidos",
+      target: "aidos/staged",
       reviewers: ["@team"],
       title: "ignored",
       body: "ignored",
@@ -729,12 +729,12 @@ describe("publishChanges — staged strategy", () => {
 describe("resolveWorkspace — staged folders", () => {
   it("creates staging branch from default when missing", async () => {
     const created = [];
-    const stagedManifest = { write: { strategy: "staged", target: "main", staging_branch: "aidos" } };
+    const stagedManifest = { write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" } };
 
     const client = mockClient({
       getBranch: async (owner, repo, branch) => {
         if (branch === "aidos/simon") throw new Error("GitHub API 404");
-        if (branch === "aidos") throw new Error("GitHub API 404");
+        if (branch === "aidos/staged") throw new Error("GitHub API 404");
         return { commit: { sha: "default-tip" }, name: branch };
       },
       createBranch: async (owner, repo, name, sha) => {
@@ -757,12 +757,12 @@ describe("resolveWorkspace — staged folders", () => {
     await resolveWorkspace(client, "simon", "org/my-repo", null);
 
     assert.ok(created.some((c) => c.name === "aidos/simon"), "user branch should be created");
-    assert.ok(created.some((c) => c.name === "aidos"), "staging branch should be created");
+    assert.ok(created.some((c) => c.name === "aidos/staged"), "staging branch should be created");
   });
 
   it("leaves staging branch alone when it already exists", async () => {
     const created = [];
-    const stagedManifest = { write: { strategy: "staged", target: "main", staging_branch: "aidos" } };
+    const stagedManifest = { write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" } };
 
     const client = mockClient({
       getBranch: async (owner, repo, branch) => {
@@ -789,7 +789,7 @@ describe("resolveWorkspace — staged folders", () => {
     await resolveWorkspace(client, "simon", "org/my-repo", null);
 
     assert.ok(created.some((c) => c.name === "aidos/simon"), "user branch should still be created");
-    assert.ok(!created.some((c) => c.name === "aidos"), "staging branch should NOT be recreated when it exists");
+    assert.ok(!created.some((c) => c.name === "aidos/staged"), "staging branch should NOT be recreated when it exists");
   });
 
   it("does nothing extra for non-staged folders", async () => {
@@ -823,14 +823,14 @@ describe("resolveWorkspace — staged folders", () => {
     assert.equal(created[0].name, "aidos/simon");
   });
 
-  it("uses default staging_branch name 'aidos' when manifest omits it", async () => {
+  it("uses default staging_branch name 'aidos/staged' when manifest omits it", async () => {
     const created = [];
     const stagedNoName = { write: { strategy: "staged", target: "main" } };
 
     const client = mockClient({
       getBranch: async (owner, repo, branch) => {
         if (branch === "aidos/simon") throw new Error("GitHub API 404");
-        if (branch === "aidos") throw new Error("GitHub API 404");
+        if (branch === "aidos/staged") throw new Error("GitHub API 404");
         return { commit: { sha: "default-tip" }, name: branch };
       },
       createBranch: async (owner, repo, name, sha) => {
@@ -849,6 +849,6 @@ describe("resolveWorkspace — staged folders", () => {
 
     await resolveWorkspace(client, "simon", "org/my-repo", null);
 
-    assert.ok(created.some((c) => c.name === "aidos"), "default name 'aidos' should be used");
+    assert.ok(created.some((c) => c.name === "aidos/staged"), "default name 'aidos/staged' should be used");
   });
 });

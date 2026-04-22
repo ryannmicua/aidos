@@ -8,19 +8,19 @@ name: AIDOS Staging Branch Lifecycle
 # or target), edit the env block below AND the branch filters in each trigger.
 
 env:
-  STAGING_BRANCH: aidos
+  STAGING_BRANCH: aidos/staged
   TARGET_BRANCH: main
   ROLLING_PR_TITLE: "AIDOS artifact updates (rolling)"
 
 on:
   push:
     branches:
-      - aidos    # must match STAGING_BRANCH
-      - main     # must match TARGET_BRANCH
+      - 'aidos/staged'    # must match STAGING_BRANCH (quoted because of the slash)
+      - main              # must match TARGET_BRANCH
   pull_request:
     types: [closed]
     branches:
-      - main     # must match TARGET_BRANCH
+      - main              # must match TARGET_BRANCH
 
 permissions:
   contents: write

@@ -65,7 +65,7 @@ export function renderManifestStatus(folder) {
   }
   const w = folder.write || {};
   if (w.strategy === "staged") {
-    const stagingName = w.staging_branch || "aidos";
+    const stagingName = w.staging_branch || "aidos/staged";
     lines.push(`  ✓ write.strategy: staged (staging: ${stagingName} → ${w.target})`);
     if (folder.rolling_pr) {
       lines.push(`  ✓ rolling PR #${folder.rolling_pr.number} (${folder.rolling_pr.state}): ${folder.rolling_pr.url}`);
@@ -293,7 +293,7 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
       folder.rolling_pr = null;
       continue;
     }
-    const stagingBranchName = folder.write.staging_branch || "aidos";
+    const stagingBranchName = folder.write.staging_branch || "aidos/staged";
     const targetBranchName = folder.write.target || defaultBranch;
 
     if (!stagingBranchesEnsured.has(stagingBranchName)) {

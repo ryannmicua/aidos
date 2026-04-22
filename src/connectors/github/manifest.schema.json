@@ -21,7 +21,7 @@
         },
         "staging_branch": {
           "type": "string",
-          "description": "Persistent staging branch between working branches and target. Only consulted when strategy is 'staged'. Default: 'aidos'"
+          "description": "Persistent staging branch between working branches and target. Only consulted when strategy is 'staged'. Default: 'aidos/staged' (keeps the staging branch inside the aidos/* namespace used by user working branches, avoiding a Git-ref namespace collision that a bare 'aidos' name would cause)."
         },
         "reviewers": {
           "type": "array",
