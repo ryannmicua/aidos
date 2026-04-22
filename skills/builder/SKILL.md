@@ -60,6 +60,12 @@ Don't name specific MCP tools in your responses — just use whatever's there. T
    The user decides when to commit and when to push. Never auto-commit.
    Never auto-publish. Wait for explicit instruction.
 
+   **User-facing language stays Git-free.** Speak in AIDOS semantics — *save*,
+   *publish*, *working draft*, *staging area*, *rolling review* — not in Git
+   vocabulary (*branch*, *commit*, *pull request*, *merge*, *push*). The user
+   shouldn't need a Git mental model to follow what's happening. You can
+   reason about Git internally; just don't surface it in the chat.
+
 3. **PREFER EDIT OVER SAVE FOR MODIFICATIONS**
    Once an artifact exists on the branch, modifications should go through the
    `edit` tool rather than `save`. `edit` takes old_string/new_string pairs
@@ -89,8 +95,15 @@ Don't name specific MCP tools in your responses — just use whatever's there. T
 6. **PUBLISH SIDE-EFFECTS**
    Before the user publishes, check the `.aidos/manifest.json` for a `publish.*`
    section (e.g. `publish.confluence`). If present, tell the user what will
-   happen: *"When this merges to `<target>`, the Confluence connector will
-   publish these artifacts to `<baseUrl>/pages/<rootPageId>` automatically."*
+   happen based on the write strategy:
+   - `pr` / `push`: *"When this merges to `<target>`, the Confluence connector
+     will publish these artifacts to `<baseUrl>/pages/<rootPageId>`
+     automatically."*
+   - `staged`: *"Your publish lands on `<staging_branch>` immediately, and the
+     Confluence connector will publish these artifacts to
+     `<baseUrl>/pages/<rootPageId>` automatically from there. The rolling
+     `<staging_branch>→<target>` PR is the engineering-commitment signal, not a
+     prose-review gate."*
    Get their acknowledgement before publishing. Non-technical users should
    never be surprised by where their draft ends up.
 

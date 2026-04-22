@@ -711,7 +711,7 @@ server.registerTool(
   {
     title: "Open AIDOS Workspace",
     description:
-      "Resolve a GitHub repo, ensure the user's aidos/ working branch exists, and discover .aidos/ folders with their write configuration.",
+      "Resolve a GitHub repo, ensure the user's aidos/ working branch exists, and discover .aidos/ folders with their write configuration. For folders with strategy 'staged', also ensures the staging branch exists (creates from default if missing), probes the rolling PR state, and detects whether the aidos-staging.yml workflow is installed.",
     inputSchema: z.object({
       query: z.string().describe("Repository name or org/repo"),
       branch: z.string().optional().describe("Override branch name (default: aidos/{username})"),
@@ -850,7 +850,7 @@ server.registerTool(
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
       branch: z.string().describe("Working branch to publish"),
-      target: z.string().describe("Target branch (e.g. main)"),
+      target: z.string().describe("Publish destination. Under strategy 'pr' or 'push': the final destination branch (e.g. 'main'). Under strategy 'staged': the staging branch (e.g. 'aidos/staged'). Read from the manifest accordingly — manifest.write.staging_branch for 'staged', manifest.write.target otherwise."),
       strategy: z.enum(["pr", "push", "staged"]).describe("Publication strategy: pr, push, or staged"),
       reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs). Ignored under strategy: 'staged' — reviewers apply to the rolling PR (use CODEOWNERS or branch protection)"),
       title: z.string().optional().describe("PR title (pr strategy only)"),
@@ -904,7 +904,7 @@ server.registerTool(
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
       branch: z.string().describe("Working branch"),
-      target: z.string().describe("Target branch (e.g. main)"),
+      target: z.string().describe("Publish destination. Under strategy 'pr' or 'push': the final destination branch (e.g. 'main'). Under strategy 'staged': the staging branch (e.g. 'aidos/staged'). Read from the manifest accordingly — manifest.write.staging_branch for 'staged', manifest.write.target otherwise."),
       strategy: z.enum(["pr", "push", "staged"]).describe("Publication strategy: pr, push, or staged"),
       reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs). Ignored under strategy: 'staged' — reviewers apply to the rolling PR (use CODEOWNERS or branch protection)"),
       title: z.string().optional(),
