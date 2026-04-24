@@ -1,26 +1,38 @@
-name: AIDOS Staging Branch Lifecycle
+name: AIDOS Branch Lifecycle
 
-# Maintains the rolling aidos->main PR, resets aidos after a merge, and syncs
-# aidos with main when main advances independently. Install one copy of this
-# file per repo that uses strategy: staged.
+# Maintains the rolling `aidos -> default branch` PR, resets `aidos` after a
+# merge, and syncs `aidos` with the default branch when default advances.
+# Install one copy of this file per repo. The connector pushes all artifact
+# saves to `aidos`; this workflow handles everything downstream.
 #
-# To customise branch names (if your manifest uses a non-default staging_branch
-# or target), edit the env block below AND the branch filters in each trigger.
-
-env:
-  STAGING_BRANCH: aidos/staged
-  TARGET_BRANCH: main
-  ROLLING_PR_TITLE: "AIDOS artifact updates (rolling)"
+# Branch names and default-branch lookup:
+#   - The `aidos` branch name is a fixed convention in v1.2.0+. Customising it
+#     is not supported (would require edits in multiple places that GitHub
+#     Actions forbids parameterising — see note on env context below).
+#   - The "target" branch is the repo's default branch, discovered at runtime
+#     via github.event.repository.default_branch. Works transparently for
+#     repos using main, master, develop, trunk, etc.
+#
+# Why `if:` literals are hardcoded and not driven by an env/vars reference:
+# GitHub Actions does NOT populate the env context at jobs.<job_id>.if scope
+# (only at step-level and below). A reference like env.STAGING_BRANCH in an
+# if: block silently resolves to "" and the job never fires. See
+# https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
 
 on:
   push:
     branches:
-      - 'aidos/staged'    # must match STAGING_BRANCH (quoted because of the slash)
-      - main              # must match TARGET_BRANCH
+      - aidos
+      # Common default-branch names — the sync-aidos-from-default job no-ops
+      # for any push whose ref doesn't match the repo's actual default branch
+      # (resolved at runtime). Add your repo's default branch name here if it
+      # isn't one of these.
+      - main
+      - master
+      - develop
+      - trunk
   pull_request:
     types: [closed]
-    branches:
-      - main              # must match TARGET_BRANCH
 
 permissions:
   contents: write
@@ -28,17 +40,17 @@ permissions:
 
 jobs:
   ensure-rolling-pr:
-    # Fires on push to the staging branch.
-    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', env.STAGING_BRANCH)
+    # Fires on push to the aidos branch. Opens the rolling PR if one doesn't
+    # already exist and aidos is ahead of the default branch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/aidos'
     runs-on: ubuntu-latest
     steps:
       - name: Ensure rolling PR exists
         uses: actions/github-script@v7
         with:
           script: |
-            const staging = process.env.STAGING_BRANCH;
-            const target = process.env.TARGET_BRANCH;
-            const title = process.env.ROLLING_PR_TITLE;
+            const target = context.payload.repository.default_branch;
+            const staging = "aidos";
 
             const existing = await github.rest.pulls.list({
               owner: context.repo.owner,
@@ -55,7 +67,7 @@ jobs:
             }
 
             // Skip when staging has no commits ahead of target — e.g. right after
-            // reset-aidos-on-merge force-resets staging to target's tip.
+            // reset-aidos-on-merge force-resets aidos to target's tip.
             const cmp = await github.rest.repos.compareCommits({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -68,11 +80,11 @@ jobs:
             }
 
             const body = [
-              "**AIDOS rolling PR.** This PR accumulates `.aidos/` artifact changes published via the AIDOS GitHub MCP connector's `staged` write strategy.",
+              "**AIDOS rolling PR.** This PR accumulates `.aidos/` artifact changes that non-coders have published via the AIDOS GitHub MCP connector.",
               "",
               "Merging signals that engineering is picking up this batch for implementation. The `" + staging + "` branch will be reset to `" + target + "` automatically after merge.",
               "",
-              "See `src/connectors/github/README.md` for the staging branch model.",
+              "See the AIDOS GitHub connector README for the aidos-branch model.",
             ].join("\n");
 
             try {
@@ -81,7 +93,7 @@ jobs:
                 repo: context.repo.repo,
                 head: staging,
                 base: target,
-                title,
+                title: "AIDOS artifact updates (rolling)",
                 body,
               });
               core.info(`Created rolling PR #${pr.data.number}: ${pr.data.html_url}`);
@@ -98,20 +110,20 @@ jobs:
             }
 
   reset-aidos-on-merge:
-    # Fires on rolling PR merge (pull_request closed & merged, head=staging, base=target).
+    # Fires on rolling PR merge (pull_request closed & merged, head=aidos, base=default_branch).
     if: >
       github.event_name == 'pull_request' &&
       github.event.pull_request.merged == true &&
-      github.event.pull_request.head.ref == env.STAGING_BRANCH &&
-      github.event.pull_request.base.ref == env.TARGET_BRANCH
+      github.event.pull_request.head.ref == 'aidos' &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch
     runs-on: ubuntu-latest
     steps:
-      - name: Hard-reset staging branch to target tip
+      - name: Hard-reset aidos branch to default branch tip
         uses: actions/github-script@v7
         with:
           script: |
-            const staging = process.env.STAGING_BRANCH;
-            const target = process.env.TARGET_BRANCH;
+            const target = context.payload.repository.default_branch;
+            const staging = "aidos";
 
             const targetRef = await github.rest.git.getRef({
               owner: context.repo.owner,
@@ -129,20 +141,31 @@ jobs:
             });
             core.info(`Reset ${staging} to ${target} tip (${targetSha.slice(0, 7)}).`);
 
-  sync-staging-from-main:
-    # Fires on push to target. Creates staging if missing; fast-forwards if clean;
-    # merges target into staging if staging has pending publishes.
-    if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', env.TARGET_BRANCH)
+  sync-aidos-from-default:
+    # Fires on push to the default branch. Creates aidos if missing; fast-forwards
+    # if clean; merges default into aidos if aidos has pending saves.
+    #
+    # The filter below uses a step-level guard because job-level if: cannot
+    # reference github.event.repository.default_branch reliably for push events
+    # (github.ref carries the pushed branch; we need the repo's default to
+    # compare). Gate inside the script instead.
+    if: github.event_name == 'push' && github.ref != 'refs/heads/aidos'
     runs-on: ubuntu-latest
     steps:
-      - name: Sync staging with target
+      - name: Sync aidos with default branch
         uses: actions/github-script@v7
         with:
           script: |
-            const staging = process.env.STAGING_BRANCH;
-            const target = process.env.TARGET_BRANCH;
+            const target = context.payload.repository.default_branch;
+            const staging = "aidos";
 
-            // 1. Ensure staging exists.
+            // Only fire when the push landed on the default branch itself.
+            if (context.ref !== `refs/heads/${target}`) {
+              core.info(`Push was to ${context.ref}, not default (${target}) — no-op.`);
+              return;
+            }
+
+            // 1. Ensure aidos exists.
             const targetRef = await github.rest.git.getRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -168,15 +191,13 @@ jobs:
               return;
             }
 
-            // 2. Compare staging to target.
+            // 2. Compare aidos to target.
             const cmp = await github.rest.repos.compareCommits({
               owner: context.repo.owner,
               repo: context.repo.repo,
               base: staging,
               head: target,
             });
-            // cmp.data.ahead_by = how many commits target has that staging does not.
-            // cmp.data.behind_by = how many commits staging has that target does not.
             const aheadOfStaging = cmp.data.ahead_by || 0;
             const stagingAhead = cmp.data.behind_by || 0;
 
@@ -186,7 +207,6 @@ jobs:
             }
 
             if (stagingAhead === 0) {
-              // Staging has nothing unique — fast-forward.
               await github.rest.git.updateRef({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -197,7 +217,7 @@ jobs:
               return;
             }
 
-            // 3. Staging has pending publishes — merge target into staging.
+            // 3. aidos has pending saves — merge target into aidos.
             try {
               const merge = await github.rest.repos.merge({
                 owner: context.repo.owner,

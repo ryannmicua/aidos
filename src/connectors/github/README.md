@@ -2,7 +2,7 @@
 
 A local MCP server that gives AI agents (Claude Desktop, Copilot) read/write access to `.aidos/` folders in GitHub repos.
 
-Lets non-technical users author AIDOS artifacts via AI without ever touching Git. The server runs as a subprocess of your MCP client and exposes 7 tools that the AI uses to resolve repos, read artifacts, save changes, surgically edit files, review diffs, publish PRs, and resolve merge conflicts.
+Lets non-technical users author AIDOS artifacts via AI without ever touching Git. The server runs as a subprocess of your MCP client and exposes 6 tools that the AI uses to resolve repos, read artifacts, save changes, surgically edit files, review diffs, and resolve merge conflicts. From v1.2.0 onward there is no separate publish action — every save lands on a shared `aidos` branch, and a persistent rolling PR to the repo's default branch is maintained by the bundled `aidos.yml` workflow. Engineering merges that PR when they're ready to pull work.
 
 ---
 
@@ -83,18 +83,28 @@ Add the `aidos-github` server entry. Use the **absolute path** to `server.js` an
 
 If the file already has other MCP servers, add `aidos-github` alongside them inside the existing `mcpServers` object.
 
-### Step 4 — Restart Claude Desktop and verify
+### Step 4 — Install the `aidos.yml` workflow in your target repo
+
+Copy `src/connectors/github/workflows/aidos.yml` into `.github/workflows/` in every repo that will host AIDOS artifacts. The workflow needs **no configuration** — branch names are conventions (`aidos` for the shared branch), and the repo's default branch is resolved at runtime.
+
+The workflow maintains three things:
+
+1. A rolling PR from `aidos` to your default branch, opened as soon as there's something to review.
+2. A reset of `aidos` back to the default branch tip after the rolling PR merges.
+3. A sync of `aidos` whenever the default branch advances independently (fast-forward when clean, merge commit otherwise).
+
+### Step 5 — Restart Claude Desktop and verify
 
 1. Quit Claude Desktop completely and reopen it
 2. Start a new chat
-3. The 7 AIDOS tools should be available: `open_workspace`, `read_artifacts`, `save`, `edit`, `diff`, `publish`, `resolve`
+3. The 6 AIDOS tools should be available: `open_workspace`, `read_artifacts`, `save`, `edit`, `diff`, `resolve`
 4. Ask Claude: *"Open the AIDOS workspace for `<your-org>/<your-repo>`"*
 5. The first call triggers GitHub device flow:
    - Claude shows: *"Go to https://github.com/login/device and enter code XXXX-XXXX"*
    - Open the URL, enter the code, authorise the OAuth App
    - Token is cached at `~/.aidos/auth.json` for future sessions
 
-The auth flow is two-phase: the first call initiates device flow and returns the code; after you authorise in the browser, ask the AI to open the workspace again and it will pick up the token. Subsequent sessions skip auth entirely and go straight to work. Tokens are auto-refreshed if revoked.
+The auth flow is two-phase: the first call initiates device flow and returns the code; after you authorise in the browser, ask the AI to open the workspace again and it will pick up the token. Subsequent sessions skip auth entirely. Tokens are auto-refreshed if revoked.
 
 ## Use
 
@@ -102,36 +112,32 @@ The auth flow is two-phase: the first call initiates device flow and returns the
 
 | Tool | Purpose |
 |------|---------|
-| `open_workspace` | Resolve repo (fuzzy match supported), create/sync working branch, discover `.aidos/` folders, validate manifest, surface work-in-progress and last publish status |
+| `open_workspace` | Resolve repo (fuzzy match supported), ensure the shared `aidos` branch exists (creating from the default branch if missing; syncing via merge from default when it has advanced), discover `.aidos/` folders, validate manifest, surface work-in-progress, report rolling PR and last Confluence publish status |
 | `read_artifacts` | Batch read all files from a `.aidos/` folder |
-| `save` | Preview files to commit (default) or commit them (`confirm=true`) |
+| `save` | Preview files to commit (default) or commit them (`confirm=true`) to the `aidos` branch |
 | `edit` | Surgical edits to existing files using `old_string`/`new_string` — faster than `save` and preserves untouched content |
-| `diff` | Show changes vs target branch |
-| `publish` | Run pre-flight checks (branch exists, conflicts, reviewers) and preview; execute on `confirm=true`. Supports three strategies: `pr`, `push`, `staged` |
-| `resolve` | Apply conflict resolutions returned by `publish` — commits the merge and opens the PR in one call |
+| `diff` | Show changes vs the default branch |
+| `resolve` | Apply conflict resolutions to reconcile `aidos` with the default branch — commits a two-parent merge on `aidos` |
 
-`save` and `publish` are two-phase: the first call returns a preview, the second call with `confirm=true` performs the action. `edit` is one-phase — the `old_string` field is the verification that the agent knows what it's changing, so no preview round-trip is needed.
+`save` is two-phase: the first call returns a preview, the second with `confirm=true` performs the write. `edit` is one-phase — the `old_string` field is the verification that the agent knows what it's changing.
 
 ### Workflow
 
 ```
-open_workspace("my-repo") → creates aidos/{you} branch, finds .aidos/ folders,
-                            validates manifest, reports WIP if any
-read_artifacts(...)       → loads all artifacts into AI context
+open_workspace("my-repo") → ensures the shared `aidos` branch exists; syncs from
+                            default if needed; reports rolling PR status
+read_artifacts(...)       → loads artifacts into AI context
 [work with AI]
 edit(edits)               → surgical change to existing files (preferred for edits)
 save(files, message)      → preview of full-file write (for new files)
-save(..., confirm=true)   → atomic commit to working branch
-diff()                    → review changes vs target branch
-publish()                 → runs pre-flight, opens PR on clean sync,
-                            returns conflict packet if main diverged
-resolve(merges)           → echoes the packet back with user's resolutions,
-                            commits the merge, opens the PR
---- strategy: "staged" (alternate publish ending) ---
-publish()                 → merges working branch → staging_branch (e.g. aidos/staged),
-                            deletes working branch. Shipped workflow maintains
-                            a rolling PR staging_branch → target.
+save(..., confirm=true)   → atomic commit on the aidos branch
+diff()                    → review changes vs default branch
+ ↓
+aidos.yml workflow        → opens / updates the rolling PR aidos → default branch
+                            automatically on each push
 ```
+
+If your working state and the default branch have diverged, `save`/`open_workspace` can surface a **conflict packet**. The AI walks through the conflicts with you and calls `resolve` with the merged content.
 
 ### Example session
 
@@ -139,7 +145,7 @@ A typical non-coder session looks like this. Your AI assistant handles the tool 
 
 > **You:** Open the AIDOS workspace for portfolio-analytics.
 >
-> *Claude:* Found your workspace at `fefundinfo-zenith/Zenith.Core` on branch `aidos/you`. One artifact folder: `docs/projects/portfolio-analytics/.aidos/`. Manifest is configured to open PRs against `main` with reviewers `@product-team`. What do you want to work on?
+> *Claude:* Found your workspace at `fefundinfo-zenith/Zenith.Core` on the shared `aidos` branch. One artifact folder: `docs/projects/portfolio-analytics/.aidos/`. The rolling PR #42 is open against `main`. What do you want to work on?
 >
 > **You:** Update F1 with the new validation approach we agreed last week.
 >
@@ -151,87 +157,68 @@ A typical non-coder session looks like this. Your AI assistant handles the tool 
 >
 > **You:** Go ahead.
 >
-> *Claude:* Saved. Anything else, or ready to publish?
->
-> **You:** Publish.
->
-> *Claude:* Pre-flight clean: branch is up to date with `main`, reviewers resolved. Call publish with confirm=true to proceed?
->
-> **You:** Yes.
->
-> *Claude:* Opened PR #42 — [link]. Merging will also trigger the Confluence publish workflow per your manifest. Done.
+> *Claude:* Saved to the `aidos` branch. Your change is now in rolling PR #42 for engineering to review — [link]. Confluence will also update within a few seconds. Anything else?
 
-That's the happy path. Two-phase prompts (`save` and `publish` both preview before acting) give you a chance to check what's about to happen before anything lands in the repo.
+That's the happy path. `save`'s two-phase preview lets you see what will land before anything touches the branch.
 
-For most revisions the AI will use `edit` under the hood — a surgical change that only sends the exact old/new text through, rather than regenerating the whole file. You'll notice this is fast (seconds) compared to `save`, which rewrites the full file and can take minutes for a large artifact. The AI picks the right tool; you don't need to think about which.
-
-When `main` has diverged and your changes clash with someone else's, `publish` returns a conflict packet instead — see the next section.
+For most revisions the AI will use `edit` under the hood — a surgical change that only sends the exact old/new text through, rather than regenerating the whole file. You'll notice this is fast (seconds) compared to `save`, which rewrites the full file and can take minutes for a large artifact.
 
 ### Handling conflicts
 
-When `main` has advanced since you last synced and your changes overlap with someone else's, `publish` can't auto-merge. Instead it returns a **conflict packet** — for each conflicting file, you'll see the common ancestor content, what's on main now, and what's on your branch.
+When the default branch has advanced and your working state clashes with someone else's, `open_workspace` returns a `sync_conflict` and the AI can call `save` again to see a full conflict packet. For each conflicting file you'll see the common ancestor content, what's on the default branch now, and what's on `aidos`.
 
-Your AI assistant will walk through each conflict with you and propose a merged version. When you're happy, the assistant calls `resolve` with your choices. The connector:
-1. Verifies the main content hasn't drifted since the packet was generated (if it has, you'll see a fresh conflict for that file).
-2. Commits a proper merge commit with both branches as parents.
-3. Opens the PR.
+Your AI assistant walks through each conflict with you and proposes a merged version. When you're happy, the assistant calls `resolve` with your choices. The connector:
+
+1. Verifies the default-branch content hasn't drifted since the packet was generated (if it has, you'll see a fresh conflict for that file).
+2. Commits a proper merge commit on `aidos` with both branches as parents.
 
 If someone else pushed between your resolution and the `resolve` call, you'll just cycle through the flow one more time — the connector never silently drops anyone's changes.
 
+### The `aidos` branch model
+
+**One shared branch, one persistent rolling PR.** All non-coders using the connector save to the same branch named `aidos`. The bundled `aidos.yml` workflow opens a rolling PR from `aidos` to the repo's default branch as soon as there's anything to review, and keeps it alive until engineering merges it.
+
+- **Non-coders** see a single, clear verb: *save*. No drafts, no branching decisions, no knowledge of PRs required. Saves that happen while the rolling PR is open just add commits to the same PR.
+- **Engineering** reviews and merges the rolling PR whenever they're ready to pull the accumulated artifact changes into the default branch. Merging is the **engineering commitment signal**.
+- **Automation** (Confluence, CI) watches the `aidos` branch for socialisation-time publishes, and watches the default branch for commit-time publishes — completely decoupled from when engineering chooses to merge.
+
+After the rolling PR merges, `aidos.yml` force-resets `aidos` back to the default branch tip. The next `save` creates a fresh rolling PR.
+
+**Branch protection** on the default branch is fully respected — engineering controls when anything lands on `main`/`master`/etc. The connector never pushes to the default branch directly.
+
 ### Manifest configuration
 
-Each `.aidos/` folder in a repo needs a `manifest.json`. Add a `write` section to control how the connector integrates changes:
+Each `.aidos/` folder can have an optional `manifest.json`. From v1.2.0, the only recognised section is `publish`:
 
 ```json
 {
-  "write": {
-    "strategy": "pr",
-    "target": "main",
-    "reviewers": ["@product-team"]
+  "publish": {
+    "confluence": {
+      "baseUrl": "https://example.atlassian.net",
+      "rootPageId": "123456789"
+    }
   }
 }
 ```
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `strategy` | `"pr"` | `"pr"` for pull request, `"push"` for direct merge, `"staged"` for merge to a persistent staging branch with a rolling PR to `target` |
-| `target` | repo default | Final target branch. For `pr`/`push`: branch to PR/merge into. For `staged`: base of the rolling PR from the staging branch |
-| `staging_branch` | `"aidos/staged"` | *(staged only)* Persistent branch between working branches and `target`. The rolling PR is opened from this branch to `target` by the shipped workflow. Default lives inside the `aidos/*` namespace (same as user working branches) to avoid a Git-ref collision that a bare `aidos` name would cause |
-| `reviewers` | `[]` | GitHub users (`alice`) or teams (`@org/team-name`) for PR review. *(staged mode: the shipped workflow does not request reviewers — use CODEOWNERS or branch-protection required reviewers instead.)* |
+See `src/connectors/confluence/README.md` for the Confluence keys. The connector no longer reads any `write` configuration — strategy is owned entirely by `aidos.yml`.
 
-### Choosing a strategy
+### Confluence publishing
 
-`pr` and `staged` both keep branch protection on `target` intact. The difference is where artifacts *land immediately*:
+If you're using the Confluence publish connector, point its trigger at the `aidos` branch — not the default branch. Non-coders' saves then fire Confluence publishes directly, which is the socialisation model: stakeholders see what the PO/BA is working on as it evolves, without waiting for engineering commitment.
 
-- **`pr`** — working branch → PR to `target`. Non-coder publishes wait on dev review before artifacts land anywhere. Fine when `.aidos/` changes need the same review rigour as code changes.
-- **`push`** — working branch → direct merge into `target`. No protection on `target`. Only appropriate for solo repos or trusted-author contexts.
-- **`staged`** — working branch → immediate merge into `staging_branch`; a rolling PR from `staging_branch` to `target` accumulates changes for dev review. Non-coders publish immediately; engineering commits by merging the rolling PR when they're ready to pick the work up.
+A typical Confluence workflow filter:
 
-Use `staged` when you want non-coders to socialise and publish artifacts (including to Confluence) without waiting on engineering commitment. The `target` branch stays protected; engineering controls when they merge the rolling PR.
-
-### Branch model
-
-Each user gets one `aidos/{github-username}` branch per repo. The branch is created from the repo's default branch and the connector only touches `.aidos/` paths, ensuring clean merges with the rest of the codebase. After PR merge or push-merge, the branch is deleted. The next session creates a fresh one.
-
-**Recommended:** enable *"Automatically delete head branches"* in the target repo's GitHub settings so `aidos/*` branches are cleaned up automatically after a PR merge.
-
-### Staging branch model (strategy: `staged`)
-
-Under `staged`, the `staging_branch` (default `aidos/staged`) is a persistent branch that sits slightly ahead of `target`. It's the socialisation surface: non-coders publish here, Confluence publishing fires from here, stakeholders read here.
-
-Merging the rolling PR `staging_branch → target` is the **engineering commitment signal**: "we're picking this up to build it." Until that merge happens, docs evolve freely on `staging_branch` without disturbing `target`.
-
-Requires the `aidos-staging.yml` workflow installed in `.github/workflows/` to maintain the rolling PR and reset `staging_branch` after each merge. If the workflow isn't installed, publishes still succeed to `staging_branch`, but no rolling PR is opened — the workspace dashboard warns when this is the case.
-
-**Install the workflow:** copy `src/connectors/github/workflows/aidos-staging.yml` into `.github/workflows/` in the target repo. If you changed `staging_branch` or `target` from the defaults (`aidos/staged` / `main`), edit the `env:` block AND the branch filters in `on:` at the top of the copied file to match.
-
-**Why `aidos/staged`, not bare `aidos`?** A branch literally named `aidos` can't coexist with branches under `aidos/*` in Git's ref hierarchy — creating one blocks the other. Nesting the staging branch inside the same namespace as user working branches (`aidos/alice`, `aidos/bob`, `aidos/staged`) sidesteps the collision cleanly.
-
-**Confluence under staged.** If you're using the Confluence publish connector, retarget its trigger branch in `.github/workflows/<confluence-workflow>.yml` from your `target` branch to your `staging_branch`. That way Confluence publishes fire when non-coders push to the staging branch — which is exactly the point: publish-for-socialisation happens without waiting for engineering commitment.
+```yaml
+on:
+  push:
+    branches: [aidos]
+    paths: ['**/.aidos/**']
+```
 
 ### Publish side-effect
 
-If the repo's `.aidos/manifest.json` has a `publish.*` section (e.g. `publish.confluence`), a merge of the working branch into the target branch will trigger a publish via GitHub Actions. The builder skill warns about this before publish — you'll know before any side-effects happen.
+If the repo's `.aidos/manifest.json` has a `publish.*` section (e.g. `publish.confluence`), pushes to `aidos` trigger publishing via GitHub Actions. The builder skill flags this before a save so non-coders know that a save will become publicly visible (e.g. on Confluence) before engineering has reviewed the rolling PR.
 
 ## Develop
 
@@ -249,7 +236,7 @@ npm install
 npm test
 ```
 
-145 tests across 30 suites. All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
+All tests are unit tests with mocked `fetch` — no GitHub API calls, no network, no auth required. Runs in under a second.
 
 ### Project structure
 
@@ -262,27 +249,27 @@ src/connectors/github/
 ├── edit.js                     ← Surgical string-replacement logic for the edit tool
 ├── manifest.js                 ← Manifest schema validation (ajv)
 ├── manifest.schema.json        ← JSON Schema for .aidos/manifest.json
-├── merge.js                    ← Conflict detection, packet building, Flavor B 3-way merge orchestration
+├── merge.js                    ← Conflict detection, packet building, 3-way merge orchestration
 ├── package.json                ← Node package (ESM, @modelcontextprotocol/sdk, zod, ajv)
 ├── README.md                   ← This file
 ├── workflows/
-│   └── aidos-staging.yml       ← GitHub Actions workflow for strategy: staged
+│   └── aidos.yml               ← GitHub Actions workflow: rolling PR, reset on merge, sync with default
 └── test/
     ├── auth.test.js            ← Token cache tests
     ├── auth-flow.test.js       ← Two-phase device flow tests
     ├── edit.test.js            ← Edit logic unit tests
     ├── errors.test.js          ← Error mapper tests
     ├── github.test.js          ← API client unit tests
-    ├── integration.test.js     ← End-to-end publish→conflict→resolve loop tests
+    ├── aidos-workflow.test.js  ← Regression test locking the aidos.yml `if:` literals
+    ├── integration.test.js     ← End-to-end conflict-packet → resolve loop
     ├── manifest.test.js        ← Manifest validation tests
     ├── merge.test.js           ← Merge logic unit tests
-    ├── preflight.test.js       ← Publish pre-flight tests
     ├── rendering.test.js       ← Workspace dashboard rendering tests
     ├── resolve-repo.test.js    ← Fuzzy repo resolution tests
     └── tools.test.js           ← Tool logic tests with mocked client
 ```
 
-Each logic function is exported from `server.js` and unit-tested in isolation (see `resolveWorkspace`, `readArtifacts`, `saveArtifacts`, `diffBranch`, `publishChanges`). The MCP tool registrations wrap these functions thinly — test the logic, not the MCP protocol.
+Each logic function is exported from `server.js` and unit-tested in isolation (see `resolveWorkspace`, `readArtifacts`, `saveArtifacts`, `diffBranch`, `resolveAndSave`). The MCP tool registrations wrap these functions thinly — test the logic, not the MCP protocol.
 
 ### Run the server manually
 
@@ -323,8 +310,8 @@ You asked the AI to open the workspace again before completing the browser autho
 **Tools don't appear in Claude Desktop**
 Check the Claude Desktop logs (Settings → Developer → Open Logs Folder) for `aidos-github` errors. Common causes: wrong path to `server.js`, `npm install` not run, invalid JSON in `claude_desktop_config.json`.
 
-**"Publish returned a conflict packet"**
-Main has changes that overlap with yours. The AI will walk through each conflict and propose a resolution — confirm or adjust each one, and the `resolve` tool commits the merge and opens the PR. No terminal or manual `git merge` required.
+**"save returned a conflict packet"**
+The default branch has changes that overlap with what's on `aidos`. The AI will walk through each conflict and propose a resolution — confirm or adjust each one, and the `resolve` tool commits the merge. No terminal or manual `git merge` required.
 
 **Re-authenticate**
 Normally not needed — a revoked or expired token triggers a fresh device flow automatically on the next call. If you want to force it, delete `~/.aidos/auth.json` and `~/.aidos/pending_auth.json`.

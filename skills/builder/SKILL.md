@@ -41,7 +41,7 @@ When the user describes work they want to deliver, you:
 
 This skill runs in multiple environments. Inspect what's available and use the right surface:
 
-- **AIDOS GitHub MCP Connector (Claude Desktop).** Tools like `open_workspace`, `read_artifacts`, `save`, `edit`, `diff`, `publish`, `resolve` are available. Use them for all repo operations. The connector manages a per-user `aidos/{username}` working branch and handles PR creation per the manifest's write strategy.
+- **AIDOS GitHub MCP Connector (Claude Desktop).** Tools like `open_workspace`, `read_artifacts`, `save`, `edit`, `diff`, `resolve` are available. Use them for all repo operations. The connector writes to a shared `aidos` branch; the bundled `aidos.yml` workflow maintains a rolling PR to the repo's default branch that engineering merges when they're ready to pull work.
 - **Direct filesystem access (Claude Code).** Read and write `.aidos/` files directly. Honour any local Git conventions the user has.
 - **Plain chat (no repo access).** Work with files the user pastes in. Render artifacts inline for copy-out.
 
@@ -83,35 +83,35 @@ Don't name specific MCP tools in your responses — just use whatever's there. T
 
 4. **BRANCHING (when a repo is available)**
    Never commit directly to main or the default branch. In the MCP environment
-   the connector handles branching — use its workspace tool which resolves
-   your per-user `aidos/{username}` branch. In the filesystem environment,
-   check existing `aidos/*` branches and let the user decide which to use.
+   the connector handles branching — use its workspace tool which resolves the
+   shared `aidos` branch (v1.2.0+). In the filesystem environment, check
+   existing `aidos/*` branches and let the user decide which to use.
 
-5. **PULL REQUESTS / PUBLISH**
-   When the user asks to open a PR or publish, check the `.aidos/manifest.json`
-   for the write target. If no manifest or no target specified, ask the user
-   where it should go. Do not assume main, master, or develop.
+5. **SAVING AND THE ROLLING PR**
+   From v1.2.0 onward there is no publish verb in the connector — `save` is the
+   only write action. Every save lands on the shared `aidos` branch. The
+   bundled `aidos.yml` workflow maintains a persistent rolling PR from `aidos`
+   to the repo's default branch; engineering merges it when they're ready to
+   pull the accumulated work. The user doesn't need to know about the PR or
+   the default branch — just that their draft is saved and will be reviewed.
 
-6. **PUBLISH SIDE-EFFECTS**
-   Before the user publishes, check the `.aidos/manifest.json` for a `publish.*`
-   section (e.g. `publish.confluence`). If present, tell the user what will
-   happen based on the write strategy:
-   - `pr` / `push`: *"When this merges to `<target>`, the Confluence connector
-     will publish these artifacts to `<baseUrl>/pages/<rootPageId>`
-     automatically."*
-   - `staged`: *"Your publish lands on `<staging_branch>` immediately, and the
-     Confluence connector will publish these artifacts to
-     `<baseUrl>/pages/<rootPageId>` automatically from there. The rolling
-     `<staging_branch>→<target>` PR is the engineering-commitment signal, not a
-     prose-review gate."*
-   Get their acknowledgement before publishing. Non-technical users should
-   never be surprised by where their draft ends up.
+6. **SAVE SIDE-EFFECTS**
+   Before the user saves, check the `.aidos/manifest.json` for a `publish.*`
+   section (e.g. `publish.confluence`). If present, tell the user:
+   *"Your save lands on the shared `aidos` branch immediately, and the
+   Confluence connector will publish these artifacts to
+   `<baseUrl>/pages/<rootPageId>` automatically from there. The rolling PR to
+   the default branch is the engineering-commitment signal, not a prose-review
+   gate."*
+   Get their acknowledgement before saving. Non-technical users should never
+   be surprised by where their draft becomes visible.
 
-7. **PUBLISH CONFLICT RESOLUTION**
-   When `publish` returns a conflict packet (status: "conflict"), `main` has
-   diverged from the working branch on one or more files. The packet contains,
-   for each conflicting file, the common-ancestor content (`base`), the current
-   content on main (`theirs`), and the branch's content (`yours`).
+7. **CONFLICT RESOLUTION**
+   If `open_workspace` reports a `sync_conflict` (or a `save` surfaces one),
+   the default branch has diverged from `aidos` on one or more files. The
+   connector returns a conflict packet containing, for each conflicting file,
+   the common-ancestor content (`base`), the current content on the default
+   branch (`theirs`), and the content on `aidos` (`yours`).
 
    Walk the user through each conflict:
    - Present the three versions clearly (prefer a diff view over raw content).
@@ -128,7 +128,7 @@ Don't name specific MCP tools in your responses — just use whatever's there. T
    happen multiple times on busy branches — it's normal, the connector never
    silently drops anyone's changes.
 
-   On success, `resolve` opens the PR (or push-merge per manifest) in the same
-   call. No separate `publish` follow-up needed.
+   On success, `resolve` commits a two-parent merge on `aidos`. No follow-up
+   call is needed — the workflow picks it up.
 
 Start by reading `builder-prompt.md`, then follow its Session Start instructions.

@@ -1,16 +1,17 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { preflightPublish, resolveConflictsAndPublish } from "../server.js";
+import { resolveAndSave } from "../server.js";
+import { detectConflicts, buildConflictPacket } from "../merge.js";
 
 function makeState() {
-  // Mutable state so we can simulate main advancing mid-flow.
+  // Mutable state so we can simulate default-branch drift mid-flow.
   const trees = {
     "base-sha":   { tree: [{ path: "a.md", type: "blob", sha: "a-base" }] },
     "main-sha":   { tree: [{ path: "a.md", type: "blob", sha: "a-main" }] },
-    "branch-sha": { tree: [{ path: "a.md", type: "blob", sha: "a-branch" }] },
+    "aidos-sha":  { tree: [{ path: "a.md", type: "blob", sha: "a-aidos" }] },
   };
-  const blobs = { "a-base": "BASE", "a-main": "MAIN", "a-branch": "BRANCH" };
-  const branches = { main: "main-sha", "aidos/simon": "branch-sha" };
+  const blobs = { "a-base": "BASE", "a-main": "MAIN", "a-aidos": "AIDOS" };
+  const branches = { main: "main-sha", aidos: "aidos-sha" };
   return { trees, blobs, branches };
 }
 
@@ -30,64 +31,58 @@ function makeClient(state) {
     createTree: async () => ({ sha: "new-tree-sha" }),
     createCommit: async () => ({ sha: "merge-commit-sha" }),
     updateRef: async () => ({}),
-    createPull: async () => ({ number: 7, html_url: "https://x/pr/7" }),
-    requestReviewers: async () => ({}),
-    lookupUser: async () => ({ login: "u" }),
   };
 }
 
-describe("publish → conflict → resolve loop", () => {
-  it("completes end-to-end when agent resolves correctly", async () => {
+describe("conflict packet → resolve loop (aidos branch)", () => {
+  it("commits the merge when resolutions match the packet and the target hasn't drifted", async () => {
     const state = makeState();
     const client = makeClient(state);
 
-    // Step 1: preflight publish — returns conflict packet.
-    const pre = await preflightPublish(client, "org", "repo", "aidos/simon", {
-      strategy: "pr", target: "main", reviewers: [],
-    });
-    assert.equal(pre.ok, false);
-    const packet = pre.conflict_packet;
+    // Step 1: detect conflicts between aidos and main and build a packet.
+    const detection = await detectConflicts(client, "org", "repo", "aidos", "main");
+    const packet = await buildConflictPacket(client, "org", "repo", detection);
     assert.equal(packet.status, "conflict");
     assert.equal(packet.conflicts.length, 1);
 
-    // Step 2: agent echoes packet back with resolution.
+    // Step 2: the AI echoes the packet back with a resolved body per file.
     const merges = packet.conflicts.map((c) => ({
       path: c.path,
       original: { base: c.base, theirs: c.theirs, yours: c.yours },
       resolved: `RESOLVED(${c.yours}|${c.theirs})`,
     }));
 
-    // Step 3: call resolve.
-    const result = await resolveConflictsAndPublish(client, "org", "repo", "aidos/simon", {
-      target: "main", strategy: "pr", reviewers: [], title: "t", body: "b", merges,
+    // Step 3: resolveAndSave commits the merge and returns.
+    const result = await resolveAndSave(client, "org", "repo", "aidos", {
+      target: "main",
+      merges,
     });
 
     assert.equal(result.status, "resolved");
-    assert.equal(result.type, "pr");
-    assert.equal(result.number, 7);
+    assert.equal(result.commit, "merge-commit-sha");
+    // The workflow owns everything after the branch update — resolveAndSave must NOT open a PR.
+    assert.ok(!("type" in result));
   });
 
-  it("surfaces a fresh conflict when main drifts mid-resolution", async () => {
+  it("surfaces a fresh conflict when the default branch drifts between packet and resolve", async () => {
     const state = makeState();
     const client = makeClient(state);
 
-    // Preflight — capture packet.
-    const pre = await preflightPublish(client, "org", "repo", "aidos/simon", {
-      strategy: "pr", target: "main", reviewers: [],
-    });
-    const packet = pre.conflict_packet;
+    const detection = await detectConflicts(client, "org", "repo", "aidos", "main");
+    const packet = await buildConflictPacket(client, "org", "repo", detection);
     const merges = packet.conflicts.map((c) => ({
       path: c.path,
       original: { base: c.base, theirs: c.theirs, yours: c.yours },
       resolved: "RESOLVED",
     }));
 
-    // Simulate main advancing on the same file BEFORE resolve is called.
+    // Simulate main advancing on the same file before resolve fires.
     state.trees["main-sha"] = { tree: [{ path: "a.md", type: "blob", sha: "a-main-new" }] };
     state.blobs["a-main-new"] = "NEWER MAIN";
 
-    const result = await resolveConflictsAndPublish(client, "org", "repo", "aidos/simon", {
-      target: "main", strategy: "pr", reviewers: [], title: "t", body: "b", merges,
+    const result = await resolveAndSave(client, "org", "repo", "aidos", {
+      target: "main",
+      merges,
     });
 
     assert.equal(result.status, "conflict");

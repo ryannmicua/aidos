@@ -37,7 +37,7 @@ When the user presents an artifact for review, you:
 
 This skill runs in multiple environments:
 
-- **AIDOS GitHub MCP Connector (Claude Desktop).** Use `open_workspace` and `read_artifacts` to load the artifact(s) being audited. You are read-only — never call `save`, `edit`, `publish`, `resolve`, or any write tool.
+- **AIDOS GitHub MCP Connector (Claude Desktop).** Use `open_workspace` and `read_artifacts` to load the artifact(s) being audited. You are read-only — never call `save`, `edit`, `resolve`, or any write tool.
 - **Direct filesystem access (Claude Code).** Read `.aidos/` files as normal project files. Never modify them.
 - **Plain chat.** Ask the user to paste the artifact(s) you need, including the preceding artifact for the coherence check.
 

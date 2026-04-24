@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch, publishChanges, resolveConflictsAndPublish, editArtifacts } from "../server.js";
+import { resolveWorkspace, readArtifacts, saveArtifacts, diffBranch, resolveAndSave, editArtifacts } from "../server.js";
 
 function mockClient(overrides = {}) {
   const defaults = {
@@ -8,7 +8,7 @@ function mockClient(overrides = {}) {
     searchRepos: async () => ({ items: [{ full_name: "org/my-repo", default_branch: "main" }] }),
     getRepo: async (o, r) => ({ full_name: `${o}/${r}`, default_branch: "main" }),
     getBranch: async () => { throw new Error("GitHub API 404"); },
-    createBranch: async () => ({ ref: "refs/heads/aidos/simon" }),
+    createBranch: async () => ({ ref: "refs/heads/aidos" }),
     getTree: async () => ({
       sha: "root",
       tree: [
@@ -18,7 +18,7 @@ function mockClient(overrides = {}) {
       ],
     }),
     getBlob: async () => ({
-      content: Buffer.from(JSON.stringify({ write: { strategy: "pr", target: "main" } })).toString("base64"),
+      content: Buffer.from(JSON.stringify({})).toString("base64"),
       encoding: "base64",
     }),
     merge: async () => ({}),
@@ -31,34 +31,28 @@ function mockClient(overrides = {}) {
 }
 
 describe("resolveWorkspace", () => {
-  it("creates branch when it does not exist", async () => {
-    let getBranchCallCount = 0;
+  it("creates the aidos branch when it does not exist", async () => {
     const client = mockClient({
-      // First call (check if user branch exists) → 404
-      // Second call (get default branch SHA) → success
-      // Third call (get user branch head after create) → success
       getBranch: async (owner, repo, branch) => {
-        getBranchCallCount++;
-        if (branch === "aidos/simon") {
+        if (branch === "aidos") {
           throw new Error("GitHub API 404");
         }
-        // Default branch or user branch after creation
         return { commit: { sha: "abc123" }, name: branch };
       },
     });
 
     const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
 
-    assert.equal(result.branch, "aidos/simon");
+    assert.equal(result.branch, "aidos");
     assert.equal(result.branch_created, true);
     assert.equal(result.default_branch, "main");
     assert.equal(result.repo, "org/my-repo");
   });
 
-  it("syncs existing branch", async () => {
+  it("syncs the existing aidos branch by merging default into it", async () => {
     let mergeCalled = false;
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "abc123" }, name: "aidos/simon" }),
+      getBranch: async () => ({ commit: { sha: "abc123" }, name: "aidos" }),
       merge: async () => {
         mergeCalled = true;
         return {};
@@ -68,11 +62,11 @@ describe("resolveWorkspace", () => {
     const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
 
     assert.equal(result.branch_created, false);
-    assert.equal(result.branch, "aidos/simon");
-    assert.ok(mergeCalled, "merge should be called to sync existing branch");
+    assert.equal(result.branch, "aidos");
+    assert.ok(mergeCalled, "merge should be called to sync existing aidos branch");
   });
 
-  it("discovers .aidos/ folders", async () => {
+  it("discovers .aidos/ folders without reading write config", async () => {
     const client = mockClient({
       getBranch: async (owner, repo, branch) => ({ commit: { sha: "abc123" }, name: branch }),
     });
@@ -81,7 +75,9 @@ describe("resolveWorkspace", () => {
 
     assert.equal(result.aidos_folders.length, 1);
     assert.equal(result.aidos_folders[0].path, ".aidos");
-    assert.ok(result.aidos_folders[0].write, "write config should be present");
+    assert.equal(result.aidos_folders[0].manifest_present, true);
+    assert.equal(result.aidos_folders[0].publish_configured, false);
+    assert.ok(!("write" in result.aidos_folders[0]), "write field should not appear on folder");
   });
 
   it("discovers multiple .aidos/ folders in monorepo", async () => {
@@ -103,8 +99,8 @@ describe("resolveWorkspace", () => {
 
     assert.equal(result.aidos_folders.length, 2);
     const paths = result.aidos_folders.map((f) => f.path);
-    assert.ok(paths.includes(".aidos"), "root .aidos/ should be found");
-    assert.ok(paths.includes("services/auth/.aidos"), "nested .aidos/ should be found");
+    assert.ok(paths.includes(".aidos"));
+    assert.ok(paths.includes("services/auth/.aidos"));
   });
 
   it("surfaces .aidos/ folders without a manifest as tree entries", async () => {
@@ -125,9 +121,9 @@ describe("resolveWorkspace", () => {
     assert.equal(folder.manifest_present, false);
   });
 
-  it("reports work in progress when branch is ahead of target", async () => {
+  it("reports work in progress when aidos is ahead of default", async () => {
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "abc123" }, name: "aidos/simon" }),
+      getBranch: async () => ({ commit: { sha: "abc123" }, name: "aidos" }),
       compare: async () => ({
         ahead_by: 3,
         files: [
@@ -142,18 +138,33 @@ describe("resolveWorkspace", () => {
     assert.equal(result.work_in_progress.files.length, 2);
   });
 
-  it("no work_in_progress when branch is even with target", async () => {
+  it("populates rolling_pr when a PR aidos → default is open", async () => {
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "abc123" }, name: "aidos/simon" }),
-      compare: async () => ({ ahead_by: 0, files: [] }),
+      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos" }),
+      listPulls: async () => [
+        { number: 77, html_url: "https://github.com/org/my-repo/pull/77", state: "open" },
+      ],
     });
+
     const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
-    assert.equal(result.work_in_progress, null);
+    assert.ok(result.rolling_pr);
+    assert.equal(result.rolling_pr.number, 77);
+    assert.equal(result.rolling_pr.state, "open");
   });
 
-  it("surfaces last publish workflow run when available", async () => {
+  it("rolling_pr is null when no open PR exists", async () => {
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos/simon" }),
+      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos" }),
+      listPulls: async () => [],
+    });
+
+    const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
+    assert.equal(result.rolling_pr, null);
+  });
+
+  it("surfaces last confluence-publish workflow run when available", async () => {
+    const client = mockClient({
+      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos" }),
       listWorkflows: async () => ({ workflows: [{ id: 42, name: "Publish to Confluence", path: ".github/workflows/confluence-publish.yml" }] }),
       listWorkflowRuns: async (o, r, wid) => {
         assert.equal(wid, 42);
@@ -162,24 +173,28 @@ describe("resolveWorkspace", () => {
     });
 
     const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
-    assert.ok(result.publish_status, "publish_status should be populated");
+    assert.ok(result.publish_status);
     assert.equal(result.publish_status.workflow, "Publish to Confluence");
     assert.equal(result.publish_status.conclusion, "success");
   });
 
-  it("publish_status is null when no matching workflow", async () => {
+  it("excludes aidos.yml from publish-status candidate workflows", async () => {
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos/simon" }),
-      listWorkflows: async () => ({ workflows: [{ id: 1, name: "CI", path: ".github/workflows/ci.yml" }] }),
+      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos" }),
+      listWorkflows: async () => ({
+        workflows: [
+          { id: 1, name: "AIDOS Branch Lifecycle", path: ".github/workflows/aidos.yml" },
+        ],
+      }),
     });
 
     const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
-    assert.equal(result.publish_status, null);
+    assert.equal(result.publish_status, null, "aidos.yml is infrastructure, not a publish workflow");
   });
 
   it("does not match paths where .aidos is a segment suffix (not its own segment)", async () => {
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos/simon" }),
+      getBranch: async () => ({ commit: { sha: "abc" }, name: "aidos" }),
       getTree: async () => ({
         sha: "root",
         tree: [
@@ -192,7 +207,7 @@ describe("resolveWorkspace", () => {
 
     const result = await resolveWorkspace(client, "simon", "org/my-repo", null);
     const paths = result.aidos_folders.map((f) => f.path);
-    assert.deepEqual(paths, [".aidos"], "only the real .aidos/ folder should be discovered");
+    assert.deepEqual(paths, [".aidos"]);
   });
 
   it("attaches a conflict packet when sync merge hits 409", async () => {
@@ -215,7 +230,7 @@ describe("resolveWorkspace", () => {
       getBlob: async (o, r, sha) => {
         const map = { "x0": "BASE", "xm": "MAIN", "xb": "BRANCH" };
         if (map[sha]) return { content: Buffer.from(map[sha]).toString("base64"), encoding: "base64" };
-        return { content: Buffer.from(JSON.stringify({ write: { strategy: "pr", target: "main" } })).toString("base64"), encoding: "base64" };
+        return { content: Buffer.from(JSON.stringify({})).toString("base64"), encoding: "base64" };
       },
     });
 
@@ -230,7 +245,7 @@ describe("resolveWorkspace", () => {
 describe("readArtifacts", () => {
   it("returns all files from .aidos/ folder", async () => {
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "head123" }, name: "aidos/simon" }),
+      getBranch: async () => ({ commit: { sha: "head123" }, name: "aidos" }),
       getTree: async () => ({
         sha: "root",
         tree: [
@@ -247,43 +262,42 @@ describe("readArtifacts", () => {
       }),
     });
 
-    const result = await readArtifacts(client, "org", "my-repo", "aidos/simon", ".aidos");
+    const result = await readArtifacts(client, "org", "my-repo", "aidos", ".aidos");
 
-    assert.equal(result.files.length, 4, "should return only .aidos/ files");
+    assert.equal(result.files.length, 4);
     const paths = result.files.map((f) => f.path);
     assert.ok(paths.includes(".aidos/problem.md"));
     assert.ok(paths.includes(".aidos/solution.md"));
     assert.ok(paths.includes(".aidos/manifest.json"));
     assert.ok(paths.includes(".aidos/feature-auth/feature-auth.md"));
-    assert.ok(!paths.includes("src/index.js"), "src/ file should not be included");
+    assert.ok(!paths.includes("src/index.js"));
 
     for (const file of result.files) {
-      assert.ok(file.path, "each file should have a path");
-      assert.ok(file.content, "each file should have content");
-      assert.ok(file.sha, "each file should have a sha");
+      assert.ok(file.path);
+      assert.ok(file.content);
+      assert.ok(file.sha);
     }
   });
 
   it("returns empty array for folder with no files", async () => {
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "head123" }, name: "aidos/simon" }),
+      getBranch: async () => ({ commit: { sha: "head123" }, name: "aidos" }),
       getTree: async () => ({ sha: "root", tree: [] }),
     });
 
-    const result = await readArtifacts(client, "org", "my-repo", "aidos/simon", ".aidos");
-
+    const result = await readArtifacts(client, "org", "my-repo", "aidos", ".aidos");
     assert.equal(result.files.length, 0);
   });
 });
 
 describe("saveArtifacts", () => {
-  it("creates atomic commit with all files", async () => {
+  it("creates atomic commit with all files on the aidos branch", async () => {
     let createTreeArgs;
     let createCommitArgs;
     let updateRefArgs;
 
     const client = mockClient({
-      getBranch: async () => ({ commit: { sha: "head123" }, name: "aidos/simon" }),
+      getBranch: async () => ({ commit: { sha: "head123" }, name: "aidos" }),
       getTree: async () => ({ sha: "root-tree-sha", tree: [] }),
       createTree: async (owner, repo, baseSha, treeEntries) => {
         createTreeArgs = { owner, repo, baseSha, treeEntries };
@@ -304,17 +318,18 @@ describe("saveArtifacts", () => {
       { path: ".aidos/solution.md", content: "# Solution" },
     ];
 
-    const result = await saveArtifacts(client, "org", "my-repo", "aidos/simon", files, "update docs");
+    const result = await saveArtifacts(client, "org", "my-repo", "aidos", files, "update docs");
 
-    assert.ok(createTreeArgs, "createTree should be called");
-    assert.equal(createTreeArgs.treeEntries.length, 2, "tree should have both files");
+    assert.ok(createTreeArgs);
+    assert.equal(createTreeArgs.treeEntries.length, 2);
     assert.equal(createTreeArgs.treeEntries[0].mode, "100644");
     assert.equal(createTreeArgs.treeEntries[0].type, "blob");
 
-    assert.ok(createCommitArgs, "createCommit should be called");
-    assert.ok(createCommitArgs.message.startsWith("[aidos]"), "commit message should start with [aidos]");
+    assert.ok(createCommitArgs);
+    assert.ok(createCommitArgs.message.startsWith("[aidos]"));
 
-    assert.ok(updateRefArgs, "updateRef should be called");
+    assert.ok(updateRefArgs);
+    assert.equal(updateRefArgs.ref, "aidos", "ref update must target the aidos branch");
     assert.equal(updateRefArgs.sha, "new-commit-sha");
 
     assert.equal(result.commit, "new-commit-sha");
@@ -323,9 +338,7 @@ describe("saveArtifacts", () => {
 
   it("skips commit when no files provided", async () => {
     const client = mockClient();
-
-    const result = await saveArtifacts(client, "org", "my-repo", "aidos/simon", [], "empty");
-
+    const result = await saveArtifacts(client, "org", "my-repo", "aidos", [], "empty");
     assert.equal(result.commit, null);
     assert.equal(result.message, "Nothing to save");
     assert.equal(result.files_changed, 0);
@@ -345,125 +358,30 @@ describe("diffBranch", () => {
       }),
     });
 
-    const result = await diffBranch(client, "org", "my-repo", "aidos/simon", "main");
+    const result = await diffBranch(client, "org", "my-repo", "aidos", "main");
 
-    assert.equal(result.files.length, 2, "should only include .aidos/ files");
-    assert.ok(result.files.every((f) => f.filename.includes(".aidos/")), "all files should be in .aidos/");
+    assert.equal(result.files.length, 2);
+    assert.ok(result.files.every((f) => f.filename.includes(".aidos/")));
     assert.equal(result.summary.files_changed, 2);
     assert.equal(result.summary.additions, 15);
     assert.equal(result.summary.deletions, 2);
     assert.equal(result.summary.commits_ahead, 2);
-
-    const first = result.files[0];
-    assert.ok("filename" in first);
-    assert.ok("status" in first);
-    assert.ok("additions" in first);
-    assert.ok("deletions" in first);
-    assert.ok("patch" in first);
   });
 
   it("returns empty diff when no changes", async () => {
     const client = mockClient({
-      compare: async () => ({
-        files: [],
-        ahead_by: 0,
-      }),
+      compare: async () => ({ files: [], ahead_by: 0 }),
     });
-
-    const result = await diffBranch(client, "org", "my-repo", "aidos/simon", "main");
-
+    const result = await diffBranch(client, "org", "my-repo", "aidos", "main");
     assert.equal(result.files.length, 0);
     assert.equal(result.summary.files_changed, 0);
     assert.equal(result.summary.commits_ahead, 0);
   });
 });
 
-describe("publishChanges", () => {
-  it("creates PR with reviewers when strategy is pr", async () => {
-    let createPullArgs;
-    let requestReviewersArgs;
-
-    const client = mockClient({
-      createPull: async (owner, repo, opts) => {
-        createPullArgs = { owner, repo, opts };
-        return { number: 42, html_url: "https://github.com/org/my-repo/pull/42" };
-      },
-      requestReviewers: async (owner, repo, pullNumber, reviewers) => {
-        requestReviewersArgs = { owner, repo, pullNumber, reviewers };
-        return {};
-      },
-    });
-
-    const result = await publishChanges(client, "org", "my-repo", "aidos/simon", {
-      strategy: "pr",
-      target: "main",
-      reviewers: ["alice", "bob"],
-      title: "Add problem statement",
-      body: "Initial problem doc",
-    });
-
-    assert.equal(result.type, "pr");
-    assert.equal(result.number, 42);
-    assert.equal(result.url, "https://github.com/org/my-repo/pull/42");
-    assert.ok(createPullArgs, "createPull should be called");
-    assert.ok(requestReviewersArgs, "requestReviewers should be called");
-  });
-
-  it("merges and deletes branch when strategy is push", async () => {
-    let mergeCalled = false;
-    let deleteRefCalled = false;
-
-    const client = mockClient({
-      merge: async () => {
-        mergeCalled = true;
-        return { sha: "merge-sha-abc" };
-      },
-      deleteRef: async () => {
-        deleteRefCalled = true;
-        return {};
-      },
-    });
-
-    const result = await publishChanges(client, "org", "my-repo", "aidos/simon", {
-      strategy: "push",
-      target: "main",
-      reviewers: [],
-    });
-
-    assert.equal(result.type, "push");
-    assert.equal(result.merge_sha, "merge-sha-abc");
-    assert.equal(result.branch_deleted, true);
-    assert.ok(mergeCalled, "merge should be called");
-    assert.ok(deleteRefCalled, "deleteRef should be called");
-  });
-
-  it("skips reviewers when none specified", async () => {
-    let requestReviewersCalled = false;
-
-    const client = mockClient({
-      createPull: async () => ({ number: 7, html_url: "https://github.com/org/my-repo/pull/7" }),
-      requestReviewers: async () => {
-        requestReviewersCalled = true;
-        return {};
-      },
-    });
-
-    await publishChanges(client, "org", "my-repo", "aidos/simon", {
-      strategy: "pr",
-      target: "main",
-      reviewers: [],
-      title: "Empty reviewers test",
-    });
-
-    assert.equal(requestReviewersCalled, false, "requestReviewers should NOT be called when no reviewers");
-  });
-});
-
-describe("resolveConflictsAndPublish", () => {
-  it("opens a PR after a successful resolve", async () => {
-    let created = null;
+describe("resolveAndSave", () => {
+  it("commits the two-parent merge and returns resolved status", async () => {
     const client = {
-      // detectConflicts path
       compare: async () => ({ merge_base_commit: { sha: "base-sha" } }),
       getBranch: async (o, r, b) => ({ commit: { sha: b === "main" ? "main-sha" : "branch-sha" } }),
       getTree: async (o, r, sha) => {
@@ -479,17 +397,10 @@ describe("resolveConflictsAndPublish", () => {
       createTree: async () => ({ sha: "new-tree" }),
       createCommit: async () => ({ sha: "merge-commit" }),
       updateRef: async () => ({}),
-      // publishChanges path
-      createPull: async (o, r, opts) => { created = opts; return { number: 42, html_url: "https://x/pr/42" }; },
-      requestReviewers: async () => ({}),
     };
 
-    const result = await resolveConflictsAndPublish(client, "org", "repo", "aidos/simon", {
+    const result = await resolveAndSave(client, "org", "repo", "aidos", {
       target: "main",
-      strategy: "pr",
-      reviewers: [],
-      title: "t",
-      body: "b",
       merges: [{
         path: "a.md",
         original: { base: "BASE", theirs: "MAIN", yours: "BRANCH" },
@@ -498,14 +409,11 @@ describe("resolveConflictsAndPublish", () => {
     });
 
     assert.equal(result.status, "resolved");
-    assert.equal(result.type, "pr");
-    assert.equal(result.number, 42);
-    assert.equal(created.head, "aidos/simon");
-    assert.equal(created.base, "main");
+    assert.equal(result.commit, "merge-commit");
+    assert.ok(!("type" in result), "resolveAndSave must not return a publish result — the workflow handles downstream");
   });
 
-  it("returns the conflict packet without opening PR when resolve surfaces new conflicts", async () => {
-    let createPullCalled = false;
+  it("returns a fresh conflict packet when the target drifted since the original packet", async () => {
     const client = {
       compare: async () => ({ merge_base_commit: { sha: "base-sha" } }),
       getBranch: async (o, r, b) => ({ commit: { sha: b === "main" ? "main-sha" : "branch-sha" } }),
@@ -519,11 +427,10 @@ describe("resolveConflictsAndPublish", () => {
         const map = { "a-base": "BASE", "a-main-NEW": "NEW MAIN", "a-branch": "BRANCH" };
         return { content: Buffer.from(map[sha] || "").toString("base64"), encoding: "base64" };
       },
-      createPull: async () => { createPullCalled = true; return { number: 0, html_url: "x" }; },
     };
 
-    const result = await resolveConflictsAndPublish(client, "org", "repo", "aidos/simon", {
-      target: "main", strategy: "pr", reviewers: [], title: "t", body: "b",
+    const result = await resolveAndSave(client, "org", "repo", "aidos", {
+      target: "main",
       merges: [{
         path: "a.md",
         original: { base: "BASE", theirs: "OLD MAIN", yours: "BRANCH" },
@@ -532,7 +439,6 @@ describe("resolveConflictsAndPublish", () => {
     });
 
     assert.equal(result.status, "conflict");
-    assert.equal(createPullCalled, false);
   });
 });
 
@@ -569,12 +475,12 @@ describe("editArtifacts", () => {
     const client = editTestClient({ files: {} });
     await assert.rejects(
       () =>
-        editArtifacts(client, "org", "repo", "aidos/simon", [
+        editArtifacts(client, "org", "repo", "aidos", [
           { path: "missing.md", old_string: "x", new_string: "y" },
         ], "test"),
       /File not found on branch: missing\.md/,
     );
-    assert.equal(client.calls.createCommit.length, 0, "no commit on validation failure");
+    assert.equal(client.calls.createCommit.length, 0);
   });
 
   it("commits a single-file edit atomically", async () => {
@@ -583,7 +489,7 @@ describe("editArtifacts", () => {
       blobs: { blob1: "Hello world" },
     });
 
-    const result = await editArtifacts(client, "org", "repo", "aidos/simon", [
+    const result = await editArtifacts(client, "org", "repo", "aidos", [
       { path: "f1.md", old_string: "world", new_string: "there" },
     ], "Test edit");
 
@@ -595,8 +501,6 @@ describe("editArtifacts", () => {
 
     const treeEntry = client.calls.createTree[0].entries.find((e) => e.path === "f1.md");
     assert.equal(treeEntry.content, "Hello there");
-    assert.equal(treeEntry.mode, "100644");
-    assert.equal(treeEntry.type, "blob");
   });
 
   it("commits a multi-file batch as a single commit", async () => {
@@ -605,14 +509,14 @@ describe("editArtifacts", () => {
       blobs: { blobA: "hello", blobB: "world" },
     });
 
-    const result = await editArtifacts(client, "org", "repo", "aidos/simon", [
+    const result = await editArtifacts(client, "org", "repo", "aidos", [
       { path: "a.md", old_string: "hello", new_string: "hi" },
       { path: "b.md", old_string: "world", new_string: "universe" },
     ], "Multi-file test");
 
     assert.equal(result.commit, "new-commit-sha");
     assert.equal(result.files_changed, 2);
-    assert.equal(client.calls.createCommit.length, 1, "single commit for batch");
+    assert.equal(client.calls.createCommit.length, 1);
     assert.equal(client.calls.createTree[0].entries.length, 2);
   });
 
@@ -622,7 +526,7 @@ describe("editArtifacts", () => {
       blobs: { blobX: "Hello world" },
     });
 
-    const result = await editArtifacts(client, "org", "repo", "aidos/simon", [
+    const result = await editArtifacts(client, "org", "repo", "aidos", [
       { path: "x.md", old_string: "Hello", new_string: "Goodbye" },
       { path: "x.md", old_string: "Goodbye world", new_string: "Farewell universe" },
     ], "Sequential");
@@ -640,15 +544,15 @@ describe("editArtifacts", () => {
 
     await assert.rejects(
       () =>
-        editArtifacts(client, "org", "repo", "aidos/simon", [
+        editArtifacts(client, "org", "repo", "aidos", [
           { path: "a.md", old_string: "hello", new_string: "hi" },
           { path: "b.md", old_string: "missing", new_string: "x" },
         ], "test"),
       /Edit failed for b\.md/,
     );
 
-    assert.equal(client.calls.createCommit.length, 0, "no commit when any file fails");
-    assert.equal(client.calls.updateRef.length, 0, "no ref update when any file fails");
+    assert.equal(client.calls.createCommit.length, 0);
+    assert.equal(client.calls.updateRef.length, 0);
   });
 
   it("prefixes the commit message with [aidos]", async () => {
@@ -657,198 +561,10 @@ describe("editArtifacts", () => {
       blobs: { blobF: "abc" },
     });
 
-    await editArtifacts(client, "org", "repo", "aidos/simon", [
+    await editArtifacts(client, "org", "repo", "aidos", [
       { path: "f.md", old_string: "abc", new_string: "xyz" },
     ], "Fix typo");
 
     assert.match(client.calls.createCommit[0].msg, /^\[aidos\] Fix typo$/);
-  });
-});
-
-describe("publishChanges — staged strategy", () => {
-  it("merges working branch into staging branch and deletes working branch", async () => {
-    let mergedInto = null;
-    let mergedFrom = null;
-    let deletedBranch = null;
-    let createPullCalled = false;
-
-    const client = mockClient({
-      merge: async (owner, repo, base, head) => {
-        mergedInto = base;
-        mergedFrom = head;
-        return { sha: "merge-abc" };
-      },
-      deleteRef: async (owner, repo, branch) => {
-        deletedBranch = branch;
-        return null;
-      },
-      createPull: async () => {
-        createPullCalled = true;
-        return { number: 99, html_url: "should-not-be-called" };
-      },
-    });
-
-    const result = await publishChanges(client, "org", "repo", "aidos/simon", {
-      strategy: "staged",
-      target: "aidos/staged",
-    });
-
-    assert.equal(result.type, "staged");
-    assert.equal(result.merge_sha, "merge-abc");
-    assert.equal(result.branch_deleted, true);
-    assert.equal(mergedInto, "aidos/staged");
-    assert.equal(mergedFrom, "aidos/simon");
-    assert.equal(deletedBranch, "aidos/simon");
-    assert.equal(createPullCalled, false, "staged strategy must not open a PR — workflow owns that");
-  });
-
-  it("ignores reviewers, title, body for staged (those apply to the rolling PR, not each publish)", async () => {
-    let requestedReviewers = false;
-    const client = mockClient({
-      merge: async () => ({ sha: "ok" }),
-      deleteRef: async () => null,
-      requestReviewers: async () => {
-        requestedReviewers = true;
-        return null;
-      },
-    });
-
-    const result = await publishChanges(client, "org", "repo", "aidos/simon", {
-      strategy: "staged",
-      target: "aidos/staged",
-      reviewers: ["@team"],
-      title: "ignored",
-      body: "ignored",
-    });
-
-    assert.equal(result.type, "staged");
-    assert.equal(requestedReviewers, false);
-  });
-});
-
-describe("resolveWorkspace — staged folders", () => {
-  it("creates staging branch from default when missing", async () => {
-    const created = [];
-    const stagedManifest = { write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" } };
-
-    const client = mockClient({
-      getBranch: async (owner, repo, branch) => {
-        if (branch === "aidos/simon") throw new Error("GitHub API 404");
-        if (branch === "aidos/staged") throw new Error("GitHub API 404");
-        return { commit: { sha: "default-tip" }, name: branch };
-      },
-      createBranch: async (owner, repo, name, sha) => {
-        created.push({ name, sha });
-        return { ref: `refs/heads/${name}` };
-      },
-      getTree: async () => ({
-        sha: "root",
-        tree: [
-          { path: ".aidos/problem.md", type: "blob", sha: "aaa" },
-          { path: ".aidos/manifest.json", type: "blob", sha: "bbb" },
-        ],
-      }),
-      getBlob: async () => ({
-        content: Buffer.from(JSON.stringify(stagedManifest)).toString("base64"),
-        encoding: "base64",
-      }),
-    });
-
-    await resolveWorkspace(client, "simon", "org/my-repo", null);
-
-    assert.ok(created.some((c) => c.name === "aidos/simon"), "user branch should be created");
-    assert.ok(created.some((c) => c.name === "aidos/staged"), "staging branch should be created");
-  });
-
-  it("leaves staging branch alone when it already exists", async () => {
-    const created = [];
-    const stagedManifest = { write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" } };
-
-    const client = mockClient({
-      getBranch: async (owner, repo, branch) => {
-        if (branch === "aidos/simon") throw new Error("GitHub API 404");
-        // staging and default both exist
-        return { commit: { sha: "some-sha" }, name: branch };
-      },
-      createBranch: async (owner, repo, name, sha) => {
-        created.push({ name, sha });
-        return { ref: `refs/heads/${name}` };
-      },
-      getTree: async () => ({
-        sha: "root",
-        tree: [
-          { path: ".aidos/manifest.json", type: "blob", sha: "bbb" },
-        ],
-      }),
-      getBlob: async () => ({
-        content: Buffer.from(JSON.stringify(stagedManifest)).toString("base64"),
-        encoding: "base64",
-      }),
-    });
-
-    await resolveWorkspace(client, "simon", "org/my-repo", null);
-
-    assert.ok(created.some((c) => c.name === "aidos/simon"), "user branch should still be created");
-    assert.ok(!created.some((c) => c.name === "aidos/staged"), "staging branch should NOT be recreated when it exists");
-  });
-
-  it("does nothing extra for non-staged folders", async () => {
-    const created = [];
-    const prManifest = { write: { strategy: "pr", target: "main" } };
-
-    const client = mockClient({
-      getBranch: async (owner, repo, branch) => {
-        if (branch === "aidos/simon") throw new Error("GitHub API 404");
-        return { commit: { sha: "default-tip" }, name: branch };
-      },
-      createBranch: async (owner, repo, name, sha) => {
-        created.push({ name, sha });
-        return { ref: `refs/heads/${name}` };
-      },
-      getTree: async () => ({
-        sha: "root",
-        tree: [
-          { path: ".aidos/manifest.json", type: "blob", sha: "bbb" },
-        ],
-      }),
-      getBlob: async () => ({
-        content: Buffer.from(JSON.stringify(prManifest)).toString("base64"),
-        encoding: "base64",
-      }),
-    });
-
-    await resolveWorkspace(client, "simon", "org/my-repo", null);
-
-    assert.equal(created.length, 1, "only user branch should be created");
-    assert.equal(created[0].name, "aidos/simon");
-  });
-
-  it("uses default staging_branch name 'aidos/staged' when manifest omits it", async () => {
-    const created = [];
-    const stagedNoName = { write: { strategy: "staged", target: "main" } };
-
-    const client = mockClient({
-      getBranch: async (owner, repo, branch) => {
-        if (branch === "aidos/simon") throw new Error("GitHub API 404");
-        if (branch === "aidos/staged") throw new Error("GitHub API 404");
-        return { commit: { sha: "default-tip" }, name: branch };
-      },
-      createBranch: async (owner, repo, name, sha) => {
-        created.push({ name, sha });
-        return { ref: `refs/heads/${name}` };
-      },
-      getTree: async () => ({
-        sha: "root",
-        tree: [{ path: ".aidos/manifest.json", type: "blob", sha: "bbb" }],
-      }),
-      getBlob: async () => ({
-        content: Buffer.from(JSON.stringify(stagedNoName)).toString("base64"),
-        encoding: "base64",
-      }),
-    });
-
-    await resolveWorkspace(client, "simon", "org/my-repo", null);
-
-    assert.ok(created.some((c) => c.name === "aidos/staged"), "default name 'aidos/staged' should be used");
   });
 });

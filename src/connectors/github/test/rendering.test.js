@@ -6,7 +6,7 @@ describe("renderManifestStatus", () => {
   it("prompts to create manifest when missing", () => {
     const out = renderManifestStatus({ manifest_present: false });
     assert.match(out, /manifest\.json is missing/);
-    assert.match(out, /default one/);
+    assert.match(out, /empty one/);
   });
 
   it("lists validation errors when present", () => {
@@ -19,54 +19,41 @@ describe("renderManifestStatus", () => {
     assert.match(out, /type mismatch/);
   });
 
-  it("reports strategy and target when write configured", () => {
+  it("confirms valid manifest without publish config", () => {
     const out = renderManifestStatus({
       manifest_present: true,
       manifest_errors: [],
-      write: { strategy: "pr", target: "main" },
       publish_configured: false,
     });
-    assert.match(out, /write\.strategy: pr/);
-    assert.match(out, /main/);
+    assert.match(out, /manifest\.json is valid/);
     assert.match(out, /publish\.confluence: not configured/);
   });
 
-  it("reports reviewers when present", () => {
+  it("reports publish.confluence when configured", () => {
     const out = renderManifestStatus({
       manifest_present: true,
       manifest_errors: [],
-      write: { strategy: "pr", target: "main", reviewers: ["@team-a", "alice"] },
       publish_configured: true,
     });
-    assert.match(out, /reviewers: @team-a, alice/);
     assert.match(out, /publish\.confluence configured/);
-  });
-
-  it("warns when write config absent", () => {
-    const out = renderManifestStatus({
-      manifest_present: true,
-      manifest_errors: [],
-      write: {},
-      publish_configured: false,
-    });
-    assert.match(out, /No write config/);
   });
 });
 
 describe("renderWorkspaceStatus", () => {
   const baseWorkspace = {
     repo: "org/my-repo",
-    branch: "aidos/simon",
+    branch: "aidos",
     branch_created: false,
     default_branch: "main",
     work_in_progress: null,
     aidos_folders: [],
+    rolling_pr: null,
   };
 
   it("offers to create .aidos/ when none exist", () => {
     const out = renderWorkspaceStatus(baseWorkspace);
     assert.match(out, /org\/my-repo/);
-    assert.match(out, /aidos\/simon/);
+    assert.match(out, /aidos/);
     assert.match(out, /synced with main/);
     assert.match(out, /No \.aidos\/ folders found/);
   });
@@ -83,7 +70,6 @@ describe("renderWorkspaceStatus", () => {
         path: ".aidos",
         manifest_present: true,
         manifest_errors: [],
-        write: { strategy: "pr", target: "main" },
         publish_configured: false,
       }],
     });
@@ -92,20 +78,38 @@ describe("renderWorkspaceStatus", () => {
     assert.match(out, /Ready to work/);
   });
 
-  it("renders multi-folder disambiguation list", () => {
+  it("renders rolling PR line when present", () => {
+    const out = renderWorkspaceStatus({
+      ...baseWorkspace,
+      aidos_folders: [{
+        path: ".aidos",
+        manifest_present: true,
+        manifest_errors: [],
+        publish_configured: false,
+      }],
+      rolling_pr: { number: 42, url: "https://github.com/org/my-repo/pull/42", state: "open" },
+    });
+    assert.match(out, /Rolling PR #42/);
+    assert.match(out, /https:\/\/github\.com\/org\/my-repo\/pull\/42/);
+  });
+
+  it("renders multi-folder disambiguation list without strategy/target", () => {
     const out = renderWorkspaceStatus({
       ...baseWorkspace,
       aidos_folders: [
-        { path: ".aidos", manifest_present: true, write: { strategy: "pr", target: "main" } },
-        { path: "services/auth/.aidos", manifest_present: true, write: { strategy: "pr", target: "develop" } },
-        { path: "packages/a/.aidos", manifest_present: false, write: {} },
+        { path: ".aidos", manifest_present: true, publish_configured: true },
+        { path: "services/auth/.aidos", manifest_present: true, publish_configured: false },
+        { path: "packages/a/.aidos", manifest_present: false, publish_configured: false },
       ],
     });
     assert.match(out, /Found 3 artifact folders/);
-    assert.match(out, /\.aidos\/ — write: pr → main/);
-    assert.match(out, /services\/auth\/\.aidos\/ — write: pr → develop/);
+    assert.match(out, /\.aidos\/ — manifest \+ confluence configured/);
+    assert.match(out, /services\/auth\/\.aidos\/ — manifest only/);
     assert.match(out, /packages\/a\/\.aidos\/ — no manifest/);
     assert.match(out, /Which one do you want to work with/);
+    // Absolutely must not reference strategy/target
+    assert.doesNotMatch(out, /write:/);
+    assert.doesNotMatch(out, /strategy/);
   });
 
   it("renders work-in-progress section", () => {
@@ -118,90 +122,22 @@ describe("renderWorkspaceStatus", () => {
           { filename: ".aidos/solution.md", status: "added" },
         ],
       },
-      aidos_folders: [{ path: ".aidos", manifest_present: true, manifest_errors: [], write: { strategy: "pr", target: "main" }, publish_configured: false }],
+      aidos_folders: [{ path: ".aidos", manifest_present: true, manifest_errors: [], publish_configured: false }],
     });
     assert.match(out, /3 commits ahead of main/);
     assert.match(out, /problem\.md \(modified\)/);
     assert.match(out, /solution\.md \(added\)/);
     assert.match(out, /start fresh/);
   });
-});
 
-describe("renderManifestStatus — staged strategy", () => {
-  it("shows rolling PR URL and state when present", () => {
-    const folder = {
-      manifest_present: true,
-      manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" },
-      publish_configured: true,
-      rolling_pr: { number: 42, url: "https://github.com/org/repo/pull/42", state: "open" },
-    };
-    const output = renderManifestStatus(folder);
-    assert.match(output, /write\.strategy: staged/);
-    assert.match(output, /rolling PR #42/);
-    assert.match(output, /https:\/\/github\.com\/org\/repo\/pull\/42/);
-  });
-
-  it("notes no rolling PR when none exists yet", () => {
-    const folder = {
-      manifest_present: true,
-      manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" },
-      publish_configured: true,
-      rolling_pr: null,
-    };
-    const output = renderManifestStatus(folder);
-    assert.match(output, /no rolling PR yet/i);
-  });
-
-  it("renders staging_branch in the strategy line", () => {
-    const folder = {
-      manifest_present: true,
-      manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "docs-staging" },
-      publish_configured: false,
-    };
-    const output = renderManifestStatus(folder);
-    assert.match(output, /staging: docs-staging → main/);
-  });
-});
-
-describe("renderManifestStatus — aidos-staging workflow warning", () => {
-  it("warns when strategy is staged and workflow is absent", () => {
-    const folder = {
-      manifest_present: true,
-      manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" },
-      publish_configured: true,
-      rolling_pr: null,
-      staging_workflow_present: false,
-    };
-    const output = renderManifestStatus(folder);
-    assert.match(output, /aidos-staging\.yml.*not installed/i);
-  });
-
-  it("does not warn when workflow is present", () => {
-    const folder = {
-      manifest_present: true,
-      manifest_errors: [],
-      write: { strategy: "staged", target: "main", staging_branch: "aidos/staged" },
-      publish_configured: true,
-      rolling_pr: null,
-      staging_workflow_present: true,
-    };
-    const output = renderManifestStatus(folder);
-    assert.doesNotMatch(output, /aidos-staging\.yml/i);
-  });
-
-  it("does not warn for non-staged folders even if workflow is absent", () => {
-    const folder = {
-      manifest_present: true,
-      manifest_errors: [],
-      write: { strategy: "pr", target: "main" },
-      publish_configured: false,
-      staging_workflow_present: false,
-    };
-    const output = renderManifestStatus(folder);
-    assert.doesNotMatch(output, /aidos-staging/i);
+  it("renders sync_conflict with pointer to resolve tool (not publish)", () => {
+    const out = renderWorkspaceStatus({
+      ...baseWorkspace,
+      sync_conflict: { conflicts: [{ path: "x.md" }] },
+      aidos_folders: [{ path: ".aidos", manifest_present: true, manifest_errors: [], publish_configured: false }],
+    });
+    assert.match(out, /file\(s\) conflict/);
+    assert.match(out, /Call resolve/);
+    assert.doesNotMatch(out, /Call publish/);
   });
 });

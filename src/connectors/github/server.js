@@ -10,7 +10,7 @@ import { validateManifest } from "./manifest.js";
 import { detectConflicts, buildConflictPacket, resolveConflicts } from "./merge.js";
 import { applyEdits } from "./edit.js";
 
-const server = new McpServer({ name: "aidos-github", version: "1.1.0" });
+const server = new McpServer({ name: "aidos-github", version: "1.2.0" });
 
 const session = {
   client: null,
@@ -55,7 +55,7 @@ function translateToolError(err, ctx = {}) {
 export function renderManifestStatus(folder) {
   const lines = ["Manifest status:"];
   if (!folder.manifest_present) {
-    lines.push("  ✗ manifest.json is missing — I can create a default one. What's the target branch for PRs? (usually 'main')");
+    lines.push("  ✗ manifest.json is missing — I can create an empty one ({}).");
     return lines.join("\n");
   }
   if (folder.manifest_errors && folder.manifest_errors.length > 0) {
@@ -63,28 +63,11 @@ export function renderManifestStatus(folder) {
     for (const e of folder.manifest_errors) lines.push(`    • ${e}`);
     return lines.join("\n");
   }
-  const w = folder.write || {};
-  if (w.strategy === "staged") {
-    const stagingName = w.staging_branch || "aidos/staged";
-    lines.push(`  ✓ write.strategy: staged (staging: ${stagingName} → ${w.target})`);
-    if (folder.rolling_pr) {
-      lines.push(`  ✓ rolling PR #${folder.rolling_pr.number} (${folder.rolling_pr.state}): ${folder.rolling_pr.url}`);
-    } else {
-      lines.push("  • no rolling PR yet — it will open on the first publish");
-    }
-    if (folder.staging_workflow_present === false) {
-      lines.push("  ⚠ aidos-staging.yml workflow not installed — publishes will succeed to the staging branch, but no rolling PR will be maintained until you install the workflow (copy from src/connectors/github/workflows/aidos-staging.yml into .github/workflows/)");
-    }
-  } else if (w.strategy) {
-    lines.push(`  ✓ write.strategy: ${w.strategy} (PRs will target ${w.target})`);
-  } else {
-    lines.push("  ⚠ No write config — Publish will default to PR against main.");
-  }
-  if (w.reviewers && w.reviewers.length) lines.push(`  ✓ write.reviewers: ${w.reviewers.join(", ")}`);
+  lines.push("  ✓ manifest.json is valid");
   if (folder.publish_configured) {
     lines.push("  ✓ publish.confluence configured");
   } else {
-    lines.push("  ✗ publish.confluence: not configured (artifacts won't auto-publish to Confluence on merge)");
+    lines.push("  • publish.confluence: not configured (artifacts won't auto-publish to Confluence)");
   }
   return lines.join("\n");
 }
@@ -109,8 +92,8 @@ export function renderWorkspaceStatus(workspace) {
 
   if (workspace.sync_conflict) {
     lines.push("");
-    lines.push(`⚠ ${workspace.sync_conflict.conflicts.length} file(s) conflict between your branch and ${workspace.default_branch}.`);
-    lines.push("  Call publish to get the full conflict packet, then resolve to apply your choices.");
+    lines.push(`⚠ ${workspace.sync_conflict.conflicts.length} file(s) conflict between the aidos branch and ${workspace.default_branch}.`);
+    lines.push("  Call resolve with the returned conflict packet to apply resolutions.");
   }
 
   if (workspace.aidos_folders.length === 0) {
@@ -126,6 +109,10 @@ export function renderWorkspaceStatus(workspace) {
     lines.push(`Artifacts folder: ${folder.path}/`);
     lines.push("");
     lines.push(renderManifestStatus(folder));
+    if (workspace.rolling_pr) {
+      lines.push("");
+      lines.push(`Rolling PR #${workspace.rolling_pr.number} (${workspace.rolling_pr.state}): ${workspace.rolling_pr.url}`);
+    }
     if (workspace.publish_status) {
       const ps = workspace.publish_status;
       const icon = ps.conclusion === "success" ? "✓" : ps.conclusion === "failure" ? "✗" : "•";
@@ -139,10 +126,8 @@ export function renderWorkspaceStatus(workspace) {
     lines.push("");
     lines.push(`Found ${workspace.aidos_folders.length} artifact folders:`);
     workspace.aidos_folders.forEach((f, i) => {
-      const target = f.write?.target || workspace.default_branch;
-      const strategy = f.write?.strategy || "pr";
-      const manifestState = f.manifest_present ? `write: ${strategy} → ${target}` : "no manifest";
-      lines.push(`  ${i + 1}. ${f.path}/ — ${manifestState}`);
+      const state = f.manifest_present ? (f.publish_configured ? "manifest + confluence configured" : "manifest only") : "no manifest";
+      lines.push(`  ${i + 1}. ${f.path}/ — ${state}`);
     });
     lines.push("");
     lines.push("Which one do you want to work with? (number or path)");
@@ -151,14 +136,18 @@ export function renderWorkspaceStatus(workspace) {
 }
 
 /**
- * Resolve a GitHub workspace for the given user:
- * - Ensures the user's aidos/{login} branch exists (creating or syncing it)
- * - Discovers .aidos/ folders and their write configuration
+ * Resolve a GitHub workspace.
+ *
+ * Ensures the shared `aidos` branch exists (creating from default branch if
+ * absent, syncing via merge from default if ahead), discovers .aidos/ folders,
+ * and probes for the rolling PR `aidos → default_branch` + any confluence
+ * publish workflow state. From v1.2.0 onward, the connector does not read
+ * any manifest `write.*` config — the aidos.yml workflow owns strategy.
  *
  * @param {object} client - GitHub API client
- * @param {string} login - GitHub username
+ * @param {string} login - GitHub username (commit author only; no longer used for branching)
  * @param {string} repoFullName - "owner/repo"
- * @param {string|null} branchOverride - override branch name (default: aidos/{login})
+ * @param {string|null} branchOverride - override branch name (default: "aidos")
  * @returns {object} workspace descriptor
  */
 export async function resolveWorkspace(client, login, repoFullName, branchOverride) {
@@ -166,7 +155,7 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
   const repoInfo = await client.getRepo(owner, repo);
   const defaultBranch = repoInfo.default_branch;
 
-  const branchName = branchOverride || `aidos/${login}`;
+  const branchName = branchOverride || "aidos";
   let branchCreated = false;
   let syncConflict = null;
 
@@ -240,10 +229,7 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
     }
   }
 
-  // Default write config
-  const defaultWrite = { strategy: "pr", target: defaultBranch, reviewers: [] };
-
-  // For each .aidos/ folder, find manifest.json and extract write config
+  // For each .aidos/ folder, detect manifest presence, validate it, and note whether publish.confluence is configured.
   const aidosFolders = await Promise.all(
     Array.from(aidosFolderSet).map(async (folderPath) => {
       const manifestPath = `${folderPath}/manifest.json`;
@@ -251,7 +237,6 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
         (e) => e.path === manifestPath && e.type === "blob",
       );
 
-      let write = { ...defaultWrite };
       const manifest_present = !!manifestEntry;
       let publish_configured = false;
       const manifest_errors = [];
@@ -262,81 +247,40 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
           const manifest = JSON.parse(content);
           const validation = validateManifest(manifest);
           if (!validation.valid) manifest_errors.push(...validation.errors);
-          if (manifest.write) write = { ...defaultWrite, ...manifest.write };
           if (manifest.publish) publish_configured = true;
         } catch (err) {
           manifest_errors.push(`Couldn't parse manifest: ${err.message}`);
         }
       }
 
-      return { path: folderPath, write, manifest_present, publish_configured, manifest_errors };
+      return { path: folderPath, manifest_present, publish_configured, manifest_errors };
     }),
   );
 
-  // Probe once: fetch all workflows and derive (a) staging-workflow presence (b) publish-status candidate
-  let wfList = [];
+  // Probe for the rolling PR `aidos → default_branch` (dashboard info only).
+  let rollingPr = null;
   try {
-    const wfs = await client.listWorkflows(owner, repo);
-    wfList = wfs.workflows || [];
+    const prs = await client.listPulls(owner, repo, {
+      state: "open",
+      head: `${owner}:${branchName}`,
+      base: defaultBranch,
+    });
+    const pr = (prs || [])[0];
+    if (pr) rollingPr = { number: pr.number, url: pr.html_url, state: pr.state };
   } catch (err) {
-    console.error(`Workflow probe failed: ${err.message}`);
-  }
-  const stagingWorkflowPresent = wfList.some((w) =>
-    /aidos-staging/i.test(w.path || "") || /aidos[-_ ]*staging/i.test(w.name || "")
-  );
-
-  // Ensure staging branches exist and look up rolling PR + workflow state for every folder.
-  const stagingBranchesEnsured = new Set();
-  for (const folder of aidosFolders) {
-    folder.staging_workflow_present = stagingWorkflowPresent;
-    if (folder.write?.strategy !== "staged") {
-      folder.rolling_pr = null;
-      continue;
-    }
-    const stagingBranchName = folder.write.staging_branch || "aidos/staged";
-    const targetBranchName = folder.write.target || defaultBranch;
-
-    if (!stagingBranchesEnsured.has(stagingBranchName)) {
-      stagingBranchesEnsured.add(stagingBranchName);
-      try {
-        await client.getBranch(owner, repo, stagingBranchName);
-      } catch (err) {
-        if (/404/.test(err.message)) {
-          try {
-            const base = await client.getBranch(owner, repo, defaultBranch);
-            await client.createBranch(owner, repo, stagingBranchName, base.commit.sha);
-          } catch (createErr) {
-            console.error(`Failed to create staging branch ${stagingBranchName}: ${createErr.message}`);
-          }
-        } else {
-          console.error(`Staging branch probe failed for ${stagingBranchName}: ${err.message}`);
-        }
-      }
-    }
-
-    try {
-      const prs = await client.listPulls(owner, repo, {
-        state: "open",
-        head: `${owner}:${stagingBranchName}`,
-        base: targetBranchName,
-      });
-      const pr = (prs || [])[0];
-      folder.rolling_pr = pr
-        ? { number: pr.number, url: pr.html_url, state: pr.state }
-        : null;
-    } catch (err) {
-      console.error(`Rolling PR lookup failed for ${stagingBranchName}: ${err.message}`);
-      folder.rolling_pr = null;
-    }
+    console.error(`Rolling PR lookup failed: ${err.message}`);
   }
 
+  // Probe latest publish-workflow run for a dashboard status line.
+  // Exclude aidos.yml — that's the rolling-PR maintainer, not a publish workflow.
   let publishStatus = null;
   try {
-    // Exclude aidos-staging.yml — that's the rolling-PR maintainer, not a publish workflow.
+    const wfs = await client.listWorkflows(owner, repo);
+    const wfList = wfs.workflows || [];
     const candidate = wfList.find((w) => {
       const path = w.path || "";
       const name = w.name || "";
-      if (/aidos-staging/i.test(path)) return false;
+      if (/aidos\.ya?ml/i.test(path) || /aidos-staging/i.test(path)) return false;
       return /confluence|publish/i.test(name) || /confluence|publish/i.test(path);
     });
     if (candidate) {
@@ -363,6 +307,7 @@ export async function resolveWorkspace(client, login, repoFullName, branchOverri
     aidos_folders: aidosFolders,
     work_in_progress: workInProgress,
     publish_status: publishStatus,
+    rolling_pr: rollingPr,
     sync_conflict: syncConflict,
   };
 }
@@ -533,135 +478,19 @@ export async function diffBranch(client, owner, repo, branch, target) {
 }
 
 /**
- * Publish changes via PR, direct push/merge, or staged merge.
- *
- * @param {object} client - GitHub API client
- * @param {string} owner - Repository owner
- * @param {string} repo - Repository name
- * @param {string} branch - Working branch to publish
- * @param {object} opts
- * @param {string} opts.strategy - "pr" | "push" | "staged"
- * @param {string} opts.target - Target branch. For pr/push: final merge target (e.g. main). For staged: staging branch (e.g. aidos)
- * @param {string[]} [opts.reviewers] - Reviewer logins (@ prefix treated as team). Ignored for staged — the shipped workflow requests reviewers on the rolling PR
- * @param {string} [opts.title] - PR title (pr strategy only)
- * @param {string} [opts.body] - PR body (pr strategy only)
- * @returns {{ type: "pr", number: number, url: string }|{ type: "push", merge_sha: string, branch_deleted: boolean }|{ type: "staged", merge_sha: string, branch_deleted: boolean }}
+ * Apply conflict resolutions supplied by the caller and commit a two-parent
+ * merge on `branch` that reconciles it with `target`. From v1.2.0 onward there
+ * is no publish step after resolve — the workflow (aidos.yml) owns everything
+ * downstream. Callers pass the merges echoed back from a previous conflict
+ * packet plus the user's resolved content per file.
  */
-export async function publishChanges(client, owner, repo, branch, opts) {
-  const { strategy, target, reviewers = [], title, body } = opts;
-
-  if (strategy === "pr") {
-    const pr = await client.createPull(owner, repo, { head: branch, base: target, title, body });
-
-    if (reviewers.length > 0) {
-      const individualReviewers = reviewers.filter((r) => !r.startsWith("@"));
-      const teamReviewers = reviewers
-        .filter((r) => r.startsWith("@"))
-        .map((r) => r.slice(1));
-      await client.requestReviewers(owner, repo, pr.number, {
-        reviewers: individualReviewers,
-        team_reviewers: teamReviewers,
-      });
-    }
-
-    return { type: "pr", number: pr.number, url: pr.html_url };
-  }
-
-  if (strategy === "staged") {
-    const mergeResult = await client.merge(owner, repo, target, branch);
-    await client.deleteRef(owner, repo, branch);
-    return { type: "staged", merge_sha: mergeResult.sha, branch_deleted: true };
-  }
-
-  // strategy === "push"
-  const mergeResult = await client.merge(owner, repo, target, branch);
-  await client.deleteRef(owner, repo, branch);
-
-  return { type: "push", merge_sha: mergeResult.sha, branch_deleted: true };
-}
-
-/**
- * Resolve conflicts and complete the publish in one call.
- *
- * Wraps resolveConflicts (which handles staleness and new-conflict detection)
- * and, on successful merge commit, invokes publishChanges to open the PR or
- * push-merge per the manifest write config.
- */
-export async function resolveConflictsAndPublish(client, owner, repo, branch, opts) {
-  const { target, strategy, reviewers, title, body, merges } = opts;
-
+export async function resolveAndSave(client, owner, repo, branch, opts) {
+  const { target, merges } = opts;
   const resolveResult = await resolveConflicts(client, owner, repo, branch, target, merges);
   if (resolveResult.status === "conflict") {
     return resolveResult;
   }
-
-  const publishResult = await publishChanges(client, owner, repo, branch, {
-    strategy, target, reviewers, title, body,
-  });
-
-  return { status: "resolved", commit: resolveResult.commit, ...publishResult };
-}
-
-// ---- Pre-flight ----
-
-export async function preflightPublish(client, owner, repo, branch, opts) {
-  const { target, reviewers = [] } = opts;
-  const checks = [];
-
-  try {
-    await client.getBranch(owner, repo, target);
-    checks.push({ name: "target_branch", pass: true, message: `Target branch '${target}' exists` });
-  } catch {
-    checks.push({ name: "target_branch", pass: false, message: `Target branch '${target}' not found` });
-  }
-
-  try {
-    const cmp = await client.compare(owner, repo, target, branch);
-    const behind = cmp.behind_by || 0;
-    if (behind > 0) {
-      const detection = await detectConflicts(client, owner, repo, branch, target);
-      if (detection.conflicts.length > 0) {
-        const packet = await buildConflictPacket(client, owner, repo, detection);
-        checks.push({
-          name: "conflicts",
-          pass: false,
-          message: `Branch is ${behind} commit(s) behind ${target} with ${detection.conflicts.length} conflicting file(s).`,
-        });
-        return { ok: false, checks, conflict_packet: packet };
-      }
-      checks.push({
-        name: "conflicts",
-        pass: true,
-        message: `Branch is behind by ${behind} but no conflicts — merge will be clean at confirm time.`,
-      });
-    } else {
-      checks.push({ name: "conflicts", pass: true, message: `No conflicts with ${target}` });
-    }
-  } catch (err) {
-    checks.push({ name: "conflicts", pass: false, message: `Couldn't check conflicts: ${err.message}` });
-  }
-
-  for (const r of reviewers) {
-    if (r.startsWith("@")) {
-      const body = r.slice(1);
-      const [orgSlug, teamSlug] = body.includes("/") ? body.split("/") : [owner, body];
-      try {
-        await client.lookupTeam(orgSlug, teamSlug);
-        checks.push({ name: "reviewers", pass: true, message: `Reviewer ${r} resolved to team ${orgSlug}/${teamSlug}` });
-      } catch {
-        checks.push({ name: "reviewers", pass: false, message: `Reviewer team '${r}' not found` });
-      }
-    } else {
-      try {
-        await client.lookupUser(r);
-        checks.push({ name: "reviewers", pass: true, message: `Reviewer '${r}' exists` });
-      } catch {
-        checks.push({ name: "reviewers", pass: false, message: `Reviewer '${r}' is not a valid GitHub user` });
-      }
-    }
-  }
-
-  return { ok: checks.every((c) => c.pass), checks };
+  return { status: "resolved", commit: resolveResult.commit };
 }
 
 // ---- Repo resolution ----
@@ -711,10 +540,10 @@ server.registerTool(
   {
     title: "Open AIDOS Workspace",
     description:
-      "Resolve a GitHub repo, ensure the user's aidos/ working branch exists, and discover .aidos/ folders with their write configuration. For folders with strategy 'staged', also ensures the staging branch exists (creates from default if missing), probes the rolling PR state, and detects whether the aidos-staging.yml workflow is installed.",
+      "Resolve a GitHub repo, ensure the shared `aidos` branch exists (creating from the default branch if absent; merging in default when it advances), and discover .aidos/ folders. Probes the rolling PR `aidos → default_branch` and any configured Confluence publish workflow for dashboard status. The connector does not read manifest write config — the aidos.yml workflow owns strategy from v1.2.0 onward.",
     inputSchema: z.object({
       query: z.string().describe("Repository name or org/repo"),
-      branch: z.string().optional().describe("Override branch name (default: aidos/{username})"),
+      branch: z.string().optional().describe("Override branch name (default: \"aidos\")"),
     }),
   },
   async ({ query, branch }) => {
@@ -842,73 +671,15 @@ server.registerTool(
 );
 
 server.registerTool(
-  "publish",
-  {
-    title: "Publish AIDOS Changes",
-    description:
-      "Preflight and publish working branch changes. Strategy options: 'pr' (open a pull request to target), 'push' (direct merge into target), or 'staged' (merge into a persistent staging branch that has a rolling PR to the final target — the AI skill reads the manifest and passes target=staging_branch in this mode). If the target branch has diverged and the merge would conflict, returns a structured conflict packet with base/theirs/yours content per file — follow up with the resolve tool after walking the user through the conflicts. Set confirm=true to execute after reviewing the preflight.",
-    inputSchema: z.object({
-      repo: z.string().describe("Repository as owner/repo"),
-      branch: z.string().describe("Working branch to publish"),
-      target: z.string().describe("Publish destination. Under strategy 'pr' or 'push': the final destination branch (e.g. 'main'). Under strategy 'staged': the staging branch (e.g. 'aidos/staged'). Read from the manifest accordingly — manifest.write.staging_branch for 'staged', manifest.write.target otherwise."),
-      strategy: z.enum(["pr", "push", "staged"]).describe("Publication strategy: pr, push, or staged"),
-      reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs). Ignored under strategy: 'staged' — reviewers apply to the rolling PR (use CODEOWNERS or branch protection)"),
-      title: z.string().optional().describe("PR title (pr strategy only)"),
-      body: z.string().optional().describe("PR body (pr strategy only)"),
-      confirm: z.boolean().default(false).describe("Set true to execute after reviewing preflight"),
-    }),
-  },
-  async ({ repo, branch, target, strategy, reviewers, title, body, confirm }) => {
-    const auth = await requireAuth();
-    if (!auth.authenticated) return textResult(auth.message);
-    const [owner, repoName] = repo.split("/");
-
-    try {
-      const pre = await preflightPublish(auth.client, owner, repoName, branch, { strategy, target, reviewers });
-      if (!pre.ok) {
-        if (pre.conflict_packet) {
-          return { content: [{ type: "text", text: JSON.stringify(pre.conflict_packet, null, 2) }] };
-        }
-        return textResult(
-          "Pre-flight found issues:\n\n" +
-          pre.checks.map((c) => `${c.pass ? "✓" : "✗"} ${c.message}`).join("\n") +
-          "\n\nFix these before publishing."
-        );
-      }
-      if (!confirm) {
-        return textResult(
-          "Pre-flight check for publish:\n\n" +
-          pre.checks.map((c) => `✓ ${c.message}`).join("\n") +
-          "\n\nCall publish again with confirm=true to proceed."
-        );
-      }
-      const result = await publishChanges(auth.client, owner, repoName, branch, {
-        strategy, target, reviewers, title, body,
-      });
-      if (result.type === "pr") {
-        return textResult(`Created PR #${result.number}: ${result.url}`);
-      }
-      return textResult(`Merged branch ${branch} into ${target} (commit ${result.merge_sha}). Branch deleted.`);
-    } catch (err) {
-      return textResult(translateToolError(err, { op: "publish", target }));
-    }
-  },
-);
-
-server.registerTool(
   "resolve",
   {
-    title: "Resolve AIDOS Publish Conflicts",
+    title: "Resolve AIDOS Branch Conflicts",
     description:
-      "Apply conflict resolutions returned by publish(). Takes an array of merge packets, each with the original base/theirs/yours echoed back verbatim from publish's response and the user's resolved content. Validates staleness (rejects if the target's content for a conflicting file changed since the packet was issued), checks for newly-conflicting paths not in the incoming merges, and on success commits a two-parent merge commit and performs the publish action (pr, push, or staged). If the target drifted or a new conflict appeared, returns a fresh conflict packet — present the new state to the user and call resolve again with updated resolutions.",
+      "Apply user-supplied conflict resolutions and commit a two-parent merge on the aidos branch that reconciles it with the repo's default branch. From v1.2.0 onward there is no publish step after resolve — the aidos.yml workflow handles everything downstream. Use this when open_workspace reports a sync_conflict, or after the connector returns a conflict packet during an earlier save. If the default branch drifted since the packet was generated, a fresh packet is returned — present the new state to the user and call resolve again with updated resolutions.",
     inputSchema: z.object({
       repo: z.string().describe("Repository as owner/repo"),
-      branch: z.string().describe("Working branch"),
-      target: z.string().describe("Publish destination. Under strategy 'pr' or 'push': the final destination branch (e.g. 'main'). Under strategy 'staged': the staging branch (e.g. 'aidos/staged'). Read from the manifest accordingly — manifest.write.staging_branch for 'staged', manifest.write.target otherwise."),
-      strategy: z.enum(["pr", "push", "staged"]).describe("Publication strategy: pr, push, or staged"),
-      reviewers: z.array(z.string()).default([]).describe("Reviewer logins (@ prefix for team slugs). Ignored under strategy: 'staged' — reviewers apply to the rolling PR (use CODEOWNERS or branch protection)"),
-      title: z.string().optional(),
-      body: z.string().optional(),
+      branch: z.string().describe("The aidos branch (use \"aidos\" unless your workspace overrode it)"),
+      target: z.string().describe("The repo's default branch (e.g. 'main' / 'develop'). Source it from open_workspace's default_branch output."),
       merges: z.array(
         z.object({
           path: z.string(),
@@ -919,17 +690,15 @@ server.registerTool(
           }),
           resolved: z.string(),
         }),
-      ).describe("Per-file resolutions; original block must be echoed verbatim from publish()'s response"),
+      ).describe("Per-file resolutions; each original block must be echoed verbatim from the conflict packet that produced it"),
     }),
   },
-  async ({ repo, branch, target, strategy, reviewers, title, body, merges }) => {
+  async ({ repo, branch, target, merges }) => {
     const auth = await requireAuth();
     if (!auth.authenticated) return textResult(auth.message);
     const [owner, repoName] = repo.split("/");
     try {
-      const result = await resolveConflictsAndPublish(auth.client, owner, repoName, branch, {
-        target, strategy, reviewers, title, body, merges,
-      });
+      const result = await resolveAndSave(auth.client, owner, repoName, branch, { target, merges });
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
       return textResult(translateToolError(err, { op: "resolve", target }));
