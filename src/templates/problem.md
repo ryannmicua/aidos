@@ -35,6 +35,7 @@ Rubric criteria:
     P8  Constraints identified → Constraints
     P9  Impact and urgency → Impact and Urgency
     P10 Existing alternatives considered → Existing Alternatives
+    P11 Implementation neutrality → cross-cutting (no single section; applies across the whole artifact)
 
 Coherence check:
   The Problem artifact is the start of the stack. No preceding artifact

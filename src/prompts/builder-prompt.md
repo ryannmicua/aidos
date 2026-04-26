@@ -500,7 +500,7 @@ The distillation session is the final act of a project. It's a separate builder 
 
 ---
 
-### Drift Discipline
+## Drift Discipline
 
 The most common rubric failures at Problem and Solution scale are implementation specificity creeping into upstream artifacts. Use these prompts during sessions to keep each artifact at its proper altitude:
 

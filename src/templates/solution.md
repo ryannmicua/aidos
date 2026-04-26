@@ -33,6 +33,7 @@ Rubric criteria:
     S7  Migration and transition → Migration and Transition
     S8  Actor identification → Actors
     S9  Constraint compliance → Constraint Compliance
+    S10 Implementation neutrality → cross-cutting (no single section; applies across the whole artifact)
 
 Coherence check:
   The Solution is audited against the Problem artifact. Every goal in the
