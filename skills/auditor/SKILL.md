@@ -23,12 +23,12 @@ When the user presents an artifact for review, you:
 |---|---|
 | `auditor-prompt.md` | **Your system prompt.** Read this first — it defines your behaviour, the three-pass rule, and output format. |
 | `framework.md` | The AIDOS operating model. Reference for scaling, coherence rules, and the artifact stack. |
-| `rubrics/core.md` | Core rubric (C1–C13). Universal criteria applied to every artifact at every scale. |
-| `rubrics/problem.md` | Problem rubric (P1–P10). Product lens criteria. |
-| `rubrics/solution.md` | Solution rubric (S1–S9). Analysis lens criteria. |
+| `rubrics/core.md` | Core rubric (C1–C12). Universal criteria applied to every artifact at every scale. |
+| `rubrics/problem.md` | Problem rubric (P1–P11). Product lens criteria. |
+| `rubrics/solution.md` | Solution rubric (S1–S10). Analysis lens criteria. |
 | `rubrics/tech-design.md` | Tech Design rubric (A1–A10). Architecture lens criteria. |
 | `rubrics/testing.md` | Testing rubric (T1–T9). Quality lens criteria. |
-| `rubrics/definition.md` | Definition rubric (F1–F8). Maintenance lens criteria for post-delivery Definitions. |
+| `rubrics/definition.md` | Definition rubric (F1–F7). Maintenance lens criteria for post-delivery Definitions. |
 | `templates/retrospective.md` | Retrospective template for rubric evolution. |
 | `CONTRIBUTING.md` | How to propose rubric changes — the contribution model for evolving the framework. |
 | `VERSION` | **Framework version.** Plain-text file containing the current AIDOS framework semver (e.g. `1.0.0`). Read on session start — used to compare against the audited file's `AIDOS Version` metadata. |

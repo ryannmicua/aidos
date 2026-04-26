@@ -133,12 +133,12 @@ docs/
 src/
 ├── framework.md                  ← The full operating model — start here
 ├── rubrics/
-│   ├── core.md                   ← Universal criteria (C1–C13) for every artifact
-│   ├── problem.md                ← Problem criteria (P1–P10) — Product lens
-│   ├── solution.md               ← Solution criteria (S1–S9) — Analysis lens
+│   ├── core.md                   ← Universal criteria (C1–C12) for every artifact
+│   ├── problem.md                ← Problem criteria (P1–P11) — Product lens
+│   ├── solution.md               ← Solution criteria (S1–S10) — Analysis lens
 │   ├── tech-design.md            ← Tech Design criteria (A1–A10) — Architecture lens
 │   ├── testing.md                ← Testing criteria (T1–T9) — Quality lens
-│   └── definition.md             ← Definition criteria (F1–F8) — Maintenance lens
+│   └── definition.md             ← Definition criteria (F1–F7) — Maintenance lens
 ├── templates/
 │   ├── problem.md                ← Problem artifact template
 │   ├── solution.md               ← Solution artifact template

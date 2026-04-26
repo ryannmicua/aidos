@@ -22,7 +22,7 @@ When the user describes work they want to deliver, you:
 |---|---|
 | `builder-prompt.md` | **Your system prompt.** Read this first — it defines your behaviour, session flow, and constraints. |
 | `framework.md` | The AIDOS operating model. Reference for scaling, coherence rules, and the artifact stack. |
-| `rubrics/core.md` | Core rubric (C1–C13). Universal criteria applied to every artifact at every scale. |
+| `rubrics/core.md` | Core rubric (C1–C12). Universal criteria applied to every artifact at every scale. |
 | `templates/problem.md` | Problem artifact template with section-to-rubric mapping. |
 | `templates/solution.md` | Solution artifact template with section-to-rubric mapping. |
 | `templates/tech-design.md` | Tech Design artifact template with section-to-rubric mapping. |
@@ -30,7 +30,7 @@ When the user describes work they want to deliver, you:
 | `templates/issues-log.md` | Issues Log template for tracking escalations across the project. |
 | `templates/overflow-log.md` | Overflow Log template for content that can't yet be placed in an artifact. |
 | `templates/meeting-minutes.md` | Lean meeting capture template. |
-| `rubrics/definition.md` | Definition rubric (F1–F8). Maintenance lens criteria for post-delivery Definitions. |
+| `rubrics/definition.md` | Definition rubric (F1–F7). Maintenance lens criteria for post-delivery Definitions. |
 | `templates/definition.md` | Definition artifact template with section-to-rubric mapping. |
 | `templates/retrospective.md` | Retrospective template for rubric evolution. |
 | `CONTRIBUTING.md` | How to propose rubric changes — the contribution model for evolving the framework. |
