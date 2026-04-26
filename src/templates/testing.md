@@ -13,6 +13,18 @@ Three depths, one template:
   Rubric (T1–T9) applies at all levels — the audit is lighter at
   story scale, but the criteria still hold.
 
+Rubric criteria:
+  Core Rubric (C1–C12) — applied to every artifact. Core criteria are
+  cross-cutting: you address them through the sections below.
+    C1  Alignment to goals — every test traces to a requirement
+    C2  Simplicity — test approach is proportionate to the risk
+    C3  Explicit trade-offs — coverage gaps are justified
+    C4  Failure modes — failure scenarios from upstream are tested
+    C5  Testability — this artifact is the proof of testability
+    C6  Observability — post-deployment verification is addressed
+    C7  Security — security-relevant scenarios are tested
+    C8  Reversibility — test cleanup and data rollback
+
   Test Strategy (epic level):
     The overall testing approach for a large initiative. Emphasise
     Coverage Map, Environment Requirements, Priority and Risk, and
@@ -37,7 +49,7 @@ Three depths, one template:
     the work has outgrown story scale.
 
 Rubric criteria:
-  Core Rubric (C1–C13) — applied to every artifact. Core criteria are
+  Core Rubric (C1–C12) — applied to every artifact. Core criteria are
   cross-cutting: you address them through the sections below.
     C1  Alignment to goals — every test traces to a requirement
     C2  Simplicity — test approach is proportionate to the risk
@@ -46,12 +58,11 @@ Rubric criteria:
     C5  Testability — this artifact is the proof of testability
     C6  Observability — post-deployment verification is addressed
     C7  Security — security-relevant scenarios are tested
-    C8  Operational impact — testing doesn't disrupt operations
-    C9  Reversibility — test cleanup and data rollback
-    C10 Future team readiness — tests are understandable and maintainable
-    C11 Internal consistency — consistent structure and terminology
-    C12 No duplication — reference requirements, don't restate them
-    C13 Single unit of work — testing scope matches one deliverable
+    C8  Reversibility — test cleanup and data rollback
+    C9  Future team readiness — tests are understandable and maintainable
+    C10 Internal consistency — consistent structure and terminology
+    C11 No duplication — reference requirements, don't restate them
+    C12 Single unit of work — testing scope matches one deliverable
 
   Testing Rubric (T1–T9) — discipline-specific criteria:
     T1  Coverage → Coverage Map

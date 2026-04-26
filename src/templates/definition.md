@@ -19,11 +19,11 @@ Audience:
   numbers, or builder sessions.
 
 Rubric criteria:
-  Core Rubric (C1–C13) — applied to every artifact. Core criteria are
+  Core Rubric (C1–C12) — applied to every artifact. Core criteria are
   cross-cutting: you address them through the sections below, not in
   separate sections.
 
-  Definition Rubric (F1–F8) — discipline-specific criteria. Each section
+  Definition Rubric (F1–F7) — discipline-specific criteria. Each section
   below maps to one or more of these:
     F1  Outcome accuracy → What This Is
     F2  Key trade-offs preserved → Why It Works This Way
@@ -31,8 +31,7 @@ Rubric criteria:
     F4  Known limitations and debt → Known Limitations and Debt
     F5  Operational context → Operational Context
     F6  Domain placement → Domain Placement
-    F7  Standalone comprehension → all sections (the Definition must stand alone)
-    F8  Currency → Status and Last Updated fields
+    F7  Currency → Status and Last Updated fields
 
 Coherence check:
   The Definition is audited against the Solution and Tech Design (and the

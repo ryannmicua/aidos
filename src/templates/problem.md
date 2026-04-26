@@ -7,7 +7,7 @@ What this is:
   Everything downstream — Solution, Tech Design, Testing — builds on this.
 
 Rubric criteria:
-  Core Rubric (C1–C13) — applied to every artifact. Core criteria are
+  Core Rubric (C1–C12) — applied to every artifact. Core criteria are
   cross-cutting: you address them through the sections below, not in
   separate sections. In particular:
     C1  Alignment to goals — every element traces to a stated goal
@@ -17,14 +17,13 @@ Rubric criteria:
     C5  Testability — goals can be verified
     C6  Observability — you'd know if the problem recurs after solving it
     C7  Security — security implications surfaced where relevant
-    C8  Operational impact — who's affected operationally
-    C9  Reversibility — which decisions here are hard to undo
-    C10 Future team readiness — no tribal knowledge required
-    C11 Internal consistency — terminology and framing are consistent
-    C12 No duplication — reference, don't copy, from other artifacts
-    C13 Single unit of work — one problem, decompose if it's too many
+    C8  Reversibility — which decisions here are hard to undo
+    C9  Future team readiness — no tribal knowledge required
+    C10 Internal consistency — terminology and framing are consistent
+    C11 No duplication — reference, don't copy, from other artifacts
+    C12 Single unit of work — one problem, decompose if it's too many
 
-  Problem Rubric (P1–P10) — discipline-specific criteria. Each section
+  Problem Rubric (P1–P11) — discipline-specific criteria. Each section
   below maps to one or more of these:
     P1  Clarity → Problem Statement
     P2  Stakeholder identification → Stakeholders
