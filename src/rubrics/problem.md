@@ -18,6 +18,7 @@ Discipline-specific criteria for assessing Problem artifacts through the **Produ
 | P8 | Constraints identified | Regulatory, technical, organisational, timeline, and budget constraints that bound the solution space are explicit. The artifact doesn't leave the Solution author to discover constraints that were known during problem framing. |
 | P9 | Impact and urgency | The cost or impact of the problem is quantified where possible — time lost, revenue at risk, users affected, manual effort consumed. Urgency is stated: why now, and what happens if this isn't addressed. The case for action is evidence-based, not assertion-based. |
 | P10 | Existing alternatives considered | The artifact acknowledges whether this problem is already solved — by a vendor product, an internal tool, a manual workaround, or a competing initiative. If alternatives exist, the reason they're insufficient is stated. Building is not the default; it's justified. |
+| P11 | Implementation neutrality | The Problem describes what's wrong, for whom, and why — not how it's solved. Specific tools, products, technologies, schemas, vendors, and APIs are absent unless they are pre-existing constraints (in which case they live in P8). Implementation language that surfaces during a Problem session is captured in the Overflow Log tagged for Solution or Tech Design — it's never lost. Premature implementation specificity creates lock-in: naming "Reporting Services Report" assumes the answer is a report; the real problem may not need a report at all. |
 
 ## Assessment
 

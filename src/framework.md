@@ -99,9 +99,9 @@ AIDOS depends on separation between artifact creation and artifact audit. The sa
 
 Every artifact is assessed against two rubric layers:
 
-**Core Rubric** — universal criteria that apply to every artifact at every scale. Alignment to goals. Simplicity. Explicit trade-offs. Failure modes. Testability. Observability. Security. Operational impact. Reversibility. Future team readiness. Unit coherence. No duplication.
+**Core Rubric** — universal criteria that apply to every artifact at every scale. Alignment to goals. Simplicity. Explicit trade-offs. Failure modes. Testability. Observability. Security. Reversibility. Future team readiness. Unit coherence. No duplication.
 
-**Discipline Rubric** — criteria specific to each artifact type. The Problem rubric (P1–P10) checks clarity, stakeholders, measurability, root cause confidence, scope, assumptions, constraints, impact, and alternatives. The Solution rubric (S1–S9) checks coherence, workflows, edge cases, alternatives, dependencies, migration, and minimum viable slice. The Tech Design rubric (A1–A10) checks components, integration, data model, error handling, technology choices, performance, deployment, and coding agent readiness. The Testing rubric (T1–T9) checks coverage, traceability, scenarios, exit criteria, expected results, test data, environments, regression, and prioritisation. The Definition rubric (F1–F8) checks outcome accuracy, key trade-offs, maintainer orientation, known limitations, operational context, domain placement, standalone comprehension, and currency.
+**Discipline Rubric** — criteria specific to each artifact type. The Problem rubric (P1–P11) checks clarity, stakeholders, measurability, root cause confidence, scope, assumptions, constraints, impact, alternatives, and implementation neutrality. The Solution rubric (S1–S10) checks coherence, workflows, edge cases, alternatives, dependencies, migration, minimum viable slice, and implementation neutrality. The Tech Design rubric (A1–A10) checks components, integration, data model, error handling, technology choices, performance, deployment, and coding agent readiness. The Testing rubric (T1–T9) checks coverage, traceability, scenarios, exit criteria, expected results, test data, environments, regression, and prioritisation. The Definition rubric (F1–F7) checks outcome accuracy, key trade-offs, maintainer orientation, known limitations, operational context, domain placement, and currency.
 
 Each criterion has a defined "what pass looks like." The auditor assesses Pass, Partial, or Fail with cited evidence. The evidence requirement is what gives rubrics teeth — you can't hand-wave a Pass. Partials are accepted or rejected by the human directing the audit, not waved through. The artifact doesn't advance until bugs are fixed.
 
@@ -355,7 +355,7 @@ The Definition lives in the Feature Repository (`definitions/`), organised by pr
 
 **A project cannot close with delivery artifacts unarchived.** Just as a project cannot close with PARKED overflow items, it cannot close without distilling its outcome into Definitions and archiving the delivery stack. The distillation session is how a project ends.
 
-The Definition rubric (F1–F8) is assessed through the Maintenance lens. Full criteria are in `src/rubrics/definition.md`.
+The Definition rubric (F1–F7) is assessed through the Maintenance lens. Full criteria are in `src/rubrics/definition.md`.
 
 ---
 

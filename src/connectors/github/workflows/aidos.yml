@@ -110,7 +110,33 @@ jobs:
             }
 
   reset-aidos-on-merge:
-    # Fires on rolling PR merge (pull_request closed & merged, head=aidos, base=default_branch).
+    # Fires on rolling PR merge (pull_request closed & merged, head=aidos,
+    # base=default_branch).
+    #
+    # IMPORTANT: the script below includes a precondition check comparing the
+    # current aidos HEAD to the merged PR's head SHA. This is load-bearing —
+    # do not strip it as redundant. Race scenario it prevents:
+    #
+    #   1. Connector pushes commit X to aidos.
+    #   2. ensure-rolling-pr opens PR aidos@X -> default_branch.
+    #   3. Maintainer merges. GitHub creates merge commit Y on default and
+    #      fires the pull_request closed webhook.
+    #   4. Before this job's runner starts (seconds, longer if queued), a
+    #      second connector session pushes commit Z to aidos (parent: X).
+    #      aidos now points at Z.
+    #   5. Without the check, the unconditional force-reset would point aidos
+    #      at default's tip (Y), orphaning Z. The non-coder whose session
+    #      produced Z has effectively lost their work — Z survives in GH's
+    #      object store ~30 days but no AIDOS workflow path leads back to it.
+    #
+    # With the check, we skip the reset when aidos has advanced past the
+    # merged tip. The next push to aidos (already in flight or imminent)
+    # triggers ensure-rolling-pr, which opens a fresh rolling PR with Z (and
+    # any later commits) on top of the now-updated default branch.
+    #
+    # GitHub's REST API has no compare-and-swap on refs, so a microsecond
+    # race remains between the getRef and updateRef calls — orders of
+    # magnitude smaller than the original webhook-to-runner-start window.
     if: >
       github.event_name == 'pull_request' &&
       github.event.pull_request.merged == true &&
@@ -124,6 +150,40 @@ jobs:
           script: |
             const target = context.payload.repository.default_branch;
             const staging = "aidos";
+            const mergedHeadSha = context.payload.pull_request &&
+                                  context.payload.pull_request.head &&
+                                  context.payload.pull_request.head.sha;
+
+            // Defensive: if the payload is somehow missing the merged head
+            // SHA, we can't verify safely. Bail rather than risk orphaning.
+            if (!mergedHeadSha) {
+              core.warning(
+                `pull_request.head.sha missing from payload — cannot verify ` +
+                `${staging} state safely. Skipping reset; next push to ` +
+                `${staging} will trigger a fresh rolling PR.`
+              );
+              return;
+            }
+
+            // Race guard: only reset if aidos still points at the merged tip.
+            // If a connector push has advanced aidos past it, skip — the new
+            // commits will form the next rolling PR.
+            const currentRef = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `heads/${staging}`,
+            });
+            const currentSha = currentRef.data.object.sha;
+
+            if (currentSha !== mergedHeadSha) {
+              core.warning(
+                `Skipping reset: ${staging} has advanced from ` +
+                `${mergedHeadSha.slice(0, 7)} (the merged tip) to ` +
+                `${currentSha.slice(0, 7)}. New commits on ${staging} will ` +
+                `form the next rolling PR — no work is lost.`
+              );
+              return;
+            }
 
             const targetRef = await github.rest.git.getRef({
               owner: context.repo.owner,

@@ -82,25 +82,24 @@ Then proceed to the audit.
 
 ## Rubric Criteria
 
-### Core Rubric (C1–C13) — Every Artifact, Every Scale
+### Core Rubric (C1–C12) — Every Artifact, Every Scale
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
 | C1 | Alignment to goals | Every element traces to a stated goal or requirement. Nothing is included that doesn't serve a declared purpose. |
-| C2 | Simplicity | The simplest approach that meets the requirements. Complexity is justified where it exists. A simpler alternative was considered and rejected for a stated reason. |
+| C2 | Simplicity | The simplest approach that meets the requirements. Complexity is justified where it exists. |
 | C3 | Explicit trade-offs | Trade-offs are named. Options considered, decision taken, and reasoning are documented. |
 | C4 | Failure modes | What can go wrong and how failures are detected or handled. Silence on failure is itself a failure. |
 | C5 | Testability | Every claim, requirement, or design choice can be verified by a specific action. |
 | C6 | Observability | How you would know — in practice — whether the thing is working or not. |
 | C7 | Security | Security implications considered proportionate to the risk. "Not applicable" is stated, not assumed. |
-| C8 | Operational impact | Who runs this, how it's deployed, what changes for operations. Ownership identified and accepted. |
-| C9 | Reversibility | What can be undone and what can't. Irreversible choices are acknowledged and justified. |
-| C10 | Future team readiness | Someone unfamiliar could pick this up and understand what was done, why, and what's left. |
-| C11 | Internal consistency | Terminology used consistently, sections don't contradict each other, reads as one coherent unit. |
-| C12 | No duplication | References rather than copies. Each fact lives in one place. |
-| C13 | Single unit of work | Addresses a single deliverable that can be independently understood, built, tested, and released. |
+| C8 | Reversibility | What can be undone and what can't. Irreversible choices are acknowledged and justified. |
+| C9 | Future team readiness | Someone unfamiliar could pick this up and understand what was done, why, and what's left. |
+| C10 | Internal consistency | Terminology used consistently, sections don't contradict each other, reads as one coherent unit. |
+| C11 | No duplication | References rather than copies. Each fact lives in one place. |
+| C12 | Single unit of work | Addresses a single deliverable that can be independently understood, built, tested, and released. |
 
-### Problem Rubric (P1–P10) — Product Lens
+### Problem Rubric (P1–P11) — Product Lens
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
@@ -114,8 +113,9 @@ Then proceed to the audit.
 | P8 | Constraints identified | Regulatory, technical, organisational, timeline, budget constraints explicit. Solution author won't discover them later. |
 | P9 | Impact and urgency | Cost quantified where possible. Why now. What happens if not addressed. Evidence-based, not assertion-based. |
 | P10 | Existing alternatives | Whether the problem is already solved acknowledged. If alternatives exist, insufficiency is stated. Building is justified. |
+| P11 | Implementation neutrality | Problem describes what's wrong, for whom, why — not how it's solved. Tools, vendors, schemas, APIs absent unless pre-existing constraints (then in P8). Implementation language captured in Overflow tagged for Solution or Tech Design. |
 
-### Solution Rubric (S1–S9) — Analysis Lens
+### Solution Rubric (S1–S10) — Analysis Lens
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
@@ -128,6 +128,7 @@ Then proceed to the audit.
 | S7 | Migration and transition | Path from current to proposed state described. Cutover, compatibility, rollback addressed. |
 | S8 | Actor identification | Every person, team, or system that interacts is identified with specific interactions described. |
 | S9 | Constraint compliance | Solution respects Problem constraints. Gaps acknowledged with explicit mitigation or trade-off. |
+| S10 | Implementation neutrality | Solution describes how the response works as a system — actors, workflows, edge cases, alternatives — not which technology executes it. Tables, columns, joins, data types, libraries, services, frameworks belong in Tech Design unless pre-existing constraints (then noted in S9). Implementation detail captured in Overflow tagged for Tech Design. |
 
 ### Tech Design Rubric (A1–A10) — Architecture Lens
 
@@ -158,7 +159,7 @@ Then proceed to the audit.
 | T8 | Regression awareness | Existing functionality at risk identified with regression tests. Proportionate to blast radius. |
 | T9 | Risk-based prioritisation | Must-pass vs should-pass distinguished. Priority clear when time is short. |
 
-### Definition Rubric (F1–F8) — Maintenance Lens
+### Definition Rubric (F1–F7) — Maintenance Lens
 
 The Definition is the post-delivery artifact — the living description of what was built, maintained as the feature evolves. Its audience is someone who was never in the room.
 
@@ -166,12 +167,11 @@ The Definition is the post-delivery artifact — the living description of what 
 |---|---|---|
 | F1 | Outcome accuracy | Describes what was actually built, not what was planned. Divergences stated with reason. |
 | F2 | Key trade-offs preserved | Significant decisions captured with context. Not every decision — the shaping ones. |
-| F3 | Maintainer orientation | Answers: what does this do, why this way, limitations, what to know to change it safely. No delivery-process language. |
+| F3 | Maintainer orientation | Self-contained. Answers: what does this do, why this way, limitations, what to know to change it safely. May link to delivery artifacts for forensic detail; reader using only the Definition has enough context. No delivery-process language. |
 | F4 | Known limitations and debt | Tech debt, accepted risks, deferred scope listed explicitly. BACKLOG items represented. |
 | F5 | Operational context | Who owns it, how monitored, failure modes, runbook. Enough for on-call without the full Tech Design. |
 | F6 | Domain placement | Filed by product domain, not project. Findable by domain browsing. |
-| F7 | Standalone comprehension | Self-contained. May link to archived delivery artifacts but doesn't require them. |
-| F8 | Currency | Reflects current system state. Updates visible via version history or "Last updated" summary. |
+| F7 | Currency | Reflects current system state. Updates visible via version history or "Last updated" summary. |
 
 **Story scale exception:** Stories do not produce Definitions. They inherit from their parent Feature or Epic Definition. Do not audit a Definition at Story scale.
 
@@ -179,9 +179,9 @@ The Definition is the post-delivery artifact — the living description of what 
 
 At story scale, audit is lighter but the criteria still apply. Focus on these as the primary assessment:
 
-**Core:** C1, C2, C3, C4, C5, C10, C13
-**Problem (Context):** P1, P5
-**Solution (User Story):** S1, S4
+**Core:** C1, C2, C3, C4, C5, C9, C12
+**Problem (Context):** P1, P5, P11
+**Solution (User Story):** S1, S4, S10
 **Tech Design (Technical Approach):** A1, A4, A9, A10
 **Testing (Acceptance Criteria):** T1, T2, T5
 
@@ -243,7 +243,7 @@ Every finding is classified:
 - **Risk** — decision required. The human decides: accept, mitigate, or defer. Risks don't block the artifact, but they need explicit disposition.
 - **Idea** — noted, not actioned unless chosen. Ideas do not drive additional audit passes. Table them separately.
 
-**C13 failures are always Bugs.** If the artifact is trying to cover too many concerns, recommend decomposition into sibling artifacts at the same scale level.
+**C12 failures are always Bugs.** If the artifact is trying to cover too many concerns, recommend decomposition into sibling artifacts at the same scale level.
 
 ---
 

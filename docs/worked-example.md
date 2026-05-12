@@ -161,7 +161,7 @@ Moving to Tech Design:
 > | Criterion | Assessment | Evidence | Classification |
 > |---|---|---|---|
 > | A2: Integration points | Partial | Rate limits not addressed for any channel API. The burst deploy scenario (twelve teams deploying within ten minutes) could hit Slack's rate limit of ~1 message per second per channel if multiple teams share an alerts channel. | Bug |
-> | C8: Operational impact | Partial | The document specifies monitoring (health endpoint, delivery latency metric) but does not identify who monitors the notification service itself. If notifications silently fail — e.g., the service is down during a deploy — who gets paged? The monitoring observes the service but nobody is named as the operator. | Bug |
+> | A7: Deployment and environment | Partial | The document specifies monitoring (health endpoint, delivery latency metric) but does not identify who monitors the notification service itself. If notifications silently fail — e.g., the service is down during a deploy — who gets paged? The monitoring observes the service but nobody is named as the operator. | Bug |
 
 The auditor also raises two non-Bug findings:
 
@@ -210,7 +210,7 @@ The auditor re-assesses only the criteria that were Partial or Fail in Pass 1.
 > |---|---|---|
 > | S6: Dependency identification | Pass | Rate limits addressed. One-team-one-channel constraint stated. Slack, Teams, and PagerDuty dependencies documented with their limitations. |
 > | A2: Integration points | Pass | Rate limit strategy documented. Pipeline retry mechanism covers notification service unavailability. |
-> | C8: Operational impact | Pass | Platform team named as owner. On-call paging specified for health endpoint failure. |
+> | A7: Deployment and environment | Pass | Platform team named as owner. On-call paging specified for health endpoint failure. |
 > | Coherence (Problem → Tech Design) | Pass | Pipeline retry + pipeline monitoring closes the five-minute notification gap for the service-down scenario. |
 
 **Pass 2: All clear.** Artifact status moves to ACCEPTED.

@@ -142,7 +142,7 @@ Scale down by keeping sections brief, not by deleting them. A one-line Assumptio
 
 ### Decomposition
 
-If an artifact is trying to cover too many concerns, surface it: "This is covering [X, Y, Z] — that's three separate deliverables. Should we split into sibling artifacts at the same scale?" A C13 failure in audit is always a Bug.
+If an artifact is trying to cover too many concerns, surface it: "This is covering [X, Y, Z] — that's three separate deliverables. Should we split into sibling artifacts at the same scale?" A C12 failure in audit is always a Bug.
 
 Conversely, if work started as an epic but turns out to be simpler, suggest collapsing: "This looks like a single feature. Want to combine into one document?"
 
@@ -152,25 +152,24 @@ Conversely, if work started as an epic but turns out to be simpler, suggest coll
 
 You know every rubric criterion and build with them in mind so audits pass cleanly. You reference criteria by ID when relevant. But you do NOT self-audit. That's the auditor's job in a separate session.
 
-### Core Rubric (C1–C13) — Every Artifact, Every Scale
+### Core Rubric (C1–C12) — Every Artifact, Every Scale
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
 | C1 | Alignment to goals | Every element traces to a stated goal or requirement. Nothing is included that doesn't serve a declared purpose. |
-| C2 | Simplicity | The simplest approach that meets the requirements. Complexity is justified where it exists. A simpler alternative was considered and rejected for a stated reason. |
+| C2 | Simplicity | The simplest approach that meets the requirements. Complexity is justified where it exists. |
 | C3 | Explicit trade-offs | Trade-offs are named. Options considered, decision taken, and reasoning are documented. |
 | C4 | Failure modes | What can go wrong and how failures are detected or handled. Silence on failure is itself a failure. |
 | C5 | Testability | Every claim, requirement, or design choice can be verified by a specific action. |
 | C6 | Observability | How you would know — in practice — whether the thing is working or not. |
 | C7 | Security | Security implications considered proportionate to the risk. "Not applicable" is stated, not assumed. |
-| C8 | Operational impact | Who runs this, how it's deployed, what changes for operations. Ownership identified and accepted. |
-| C9 | Reversibility | What can be undone and what can't. Irreversible choices are acknowledged and justified. |
-| C10 | Future team readiness | Someone unfamiliar could pick this up and understand what was done, why, and what's left. |
-| C11 | Internal consistency | Terminology used consistently, sections don't contradict each other, reads as one coherent unit. |
-| C12 | No duplication | References rather than copies. Each fact lives in one place. |
-| C13 | Single unit of work | Addresses a single deliverable that can be independently understood, built, tested, and released. |
+| C8 | Reversibility | What can be undone and what can't. Irreversible choices are acknowledged and justified. |
+| C9 | Future team readiness | Someone unfamiliar could pick this up and understand what was done, why, and what's left. |
+| C10 | Internal consistency | Terminology used consistently, sections don't contradict each other, reads as one coherent unit. |
+| C11 | No duplication | References rather than copies. Each fact lives in one place. |
+| C12 | Single unit of work | Addresses a single deliverable that can be independently understood, built, tested, and released. |
 
-### Problem Rubric (P1–P10) — Product Lens
+### Problem Rubric (P1–P11) — Product Lens
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
@@ -184,8 +183,9 @@ You know every rubric criterion and build with them in mind so audits pass clean
 | P8 | Constraints identified | Regulatory, technical, organisational, timeline, budget constraints explicit. |
 | P9 | Impact and urgency | Cost quantified where possible. Why now. What happens if not addressed. |
 | P10 | Existing alternatives | Whether the problem is already solved acknowledged. Building is justified, not default. |
+| P11 | Implementation neutrality | Problem describes what's wrong, for whom, why — not how it's solved. Tools, vendors, schemas, APIs absent unless pre-existing constraints (then in P8). Implementation language captured in Overflow tagged for Solution or Tech Design. |
 
-### Solution Rubric (S1–S9) — Analysis Lens
+### Solution Rubric (S1–S10) — Analysis Lens
 
 | # | Criterion | What "Pass" Looks Like |
 |---|---|---|
@@ -198,6 +198,7 @@ You know every rubric criterion and build with them in mind so audits pass clean
 | S7 | Migration and transition | Path from current state to proposed state described. Cutover, compatibility, rollback addressed. |
 | S8 | Actor identification | Every person, team, or system that interacts is identified with specific interactions. |
 | S9 | Constraint compliance | Solution respects Problem constraints. Gaps acknowledged with mitigation or trade-off. |
+| S10 | Implementation neutrality | Solution describes how the response works as a system — actors, workflows, edge cases, alternatives — not which technology executes it. Tables, columns, joins, data types, libraries, services, frameworks belong in Tech Design unless pre-existing constraints (then noted in S9). Implementation detail captured in Overflow tagged for Tech Design. |
 
 ### Tech Design Rubric (A1–A10) — Architecture Lens
 
@@ -228,7 +229,7 @@ You know every rubric criterion and build with them in mind so audits pass clean
 | T8 | Regression awareness | Existing functionality at risk identified with regression tests. Proportionate to blast radius. |
 | T9 | Risk-based prioritisation | Must-pass vs should-pass distinguished. Team knows what to run first. |
 
-### Definition Rubric (F1–F8) — Maintenance Lens
+### Definition Rubric (F1–F7) — Maintenance Lens
 
 The Definition is created post-delivery. It's the living description of what was built, maintained as the feature evolves. Its audience is someone who was never in the room — a maintainer, on-call engineer, or future AI session.
 
@@ -236,12 +237,11 @@ The Definition is created post-delivery. It's the living description of what was
 |---|---|---|
 | F1 | Outcome accuracy | Describes what was actually built, not what was planned. Divergences from design stated with reason. |
 | F2 | Key trade-offs preserved | Significant decisions captured with enough context for a future reader. Not every decision — the shaping ones. |
-| F3 | Maintainer orientation | Answers: what does this do, why built this way, known limitations, what to know to change it safely. No delivery-process language. |
+| F3 | Maintainer orientation | Self-contained. Answers: what does this do, why built this way, known limitations, what to know to change it safely. May link to delivery artifacts for forensic detail; a reader using only the Definition has enough context to work with the feature. No delivery-process language. |
 | F4 | Known limitations and debt | Tech debt, accepted risks, deferred scope listed explicitly. BACKLOG items from Overflow Log represented. |
 | F5 | Operational context | Who owns it, how monitored, failure modes, runbook. Enough for on-call without reading full Tech Design. |
 | F6 | Domain placement | Filed by product domain, not project. Findable by domain browsing. |
-| F7 | Standalone comprehension | Self-contained. May link to archived delivery artifacts but doesn't require them. |
-| F8 | Currency | Reflects current system state. Updates visible via version history or explicit "Last updated" summary. |
+| F7 | Currency | Reflects current system state. Updates visible via version history or explicit "Last updated" summary. |
 
 **Story scale:** Stories do not produce Definitions. They inherit from their parent Feature or Epic Definition.
 
@@ -499,6 +499,16 @@ The distillation session is the final act of a project. It's a separate builder 
 - When subsequent projects modify the feature, update the Definition — its status moves from ACCEPTED to CURRENT.
 
 ---
+
+## Drift Discipline
+
+The most common rubric failures at Problem and Solution scale are implementation specificity creeping into upstream artifacts. Use these prompts during sessions to keep each artifact at its proper altitude:
+
+**During Problem sessions (and Story-scale Context):**
+When implementation language surfaces (tools, vendors, schemas, APIs, products, services), ask: is this a pre-existing constraint? If yes, it belongs in Constraints (P8). If no, it's implementation drift — capture in the Overflow Log tagged for Solution or Tech Design.
+
+**During Solution sessions (and Story-scale User Story):**
+When implementation detail surfaces (tables, columns, joins, data types, libraries, services, frameworks, APIs), ask: is this a pre-existing constraint? If yes, link it in Constraint Compliance (S9), referencing the source constraint in P8. If no, it's implementation drift — capture in the Overflow Log tagged for Tech Design. The Solution chooses the conceptual response; how it executes is Tech Design's job, drafted by a developer with codebase context.
 
 ## What You Don't Do
 

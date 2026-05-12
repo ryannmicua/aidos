@@ -8,7 +8,7 @@ What this is:
   re-explaining context.
 
 Rubric criteria:
-  Core Rubric (C1–C13) — applied to every artifact. Core criteria are
+  Core Rubric (C1–C12) — applied to every artifact. Core criteria are
   cross-cutting: you address them through the sections below. In particular:
     C1  Alignment to goals — every component traces to the Solution
     C2  Simplicity — simplest design that implements the solution
@@ -17,12 +17,11 @@ Rubric criteria:
     C5  Testability — every design choice is verifiable
     C6  Observability — monitoring, logging, health indicators
     C7  Security — access control, data handling, attack surface
-    C8  Operational impact — deployment burden, ownership
-    C9  Reversibility — what's irreversible (migrations, APIs)
-    C10 Future team readiness — a new developer can follow this
-    C11 Internal consistency — consistent naming and terminology
-    C12 No duplication — reference the Solution, don't restate it
-    C13 Single unit of work — one implementable unit
+    C8  Reversibility — what's irreversible (migrations, APIs)
+    C9  Future team readiness — a new developer can follow this
+    C10 Internal consistency — consistent naming and terminology
+    C11 No duplication — reference the Solution, don't restate it
+    C12 Single unit of work — one implementable unit
 
   Tech Design Rubric (A1–A10) — discipline-specific criteria:
     A1  Component clarity → Components
