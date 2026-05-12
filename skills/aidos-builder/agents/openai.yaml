@@ -1,0 +1,7 @@
+interface:
+  display_name: "AIDOS Builder"
+  short_description: "Build delivery artifacts using the AIDOS framework."
+  brand_color: "#0F766E"
+
+policy:
+  allow_implicit_invocation: true

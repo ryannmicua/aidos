@@ -1,0 +1,7 @@
+interface:
+  display_name: "AIDOS Auditor"
+  short_description: "Audit delivery artifacts against AIDOS rubrics"
+  brand_color: "#0F766E"
+
+policy:
+  allow_implicit_invocation: true
